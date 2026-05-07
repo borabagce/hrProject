@@ -17,15 +17,10 @@ import knowledgeProfileRoutes from './routes/knowledgeProfile.routes.js';
 const app = express();
 
 app.use(helmet());
-const allowedOrigins = new Set(
-  process.env.CORS_ORIGIN?.split(',').map((s) => s.trim()).filter(Boolean) ?? []
-);
+const allowedOrigins = process.env.CORS_ORIGIN?.split(',').map((s) => s.trim()).filter(Boolean) ?? [];
 app.use(
   cors({
-    origin: (origin, cb) => {
-      if (!origin || allowedOrigins.has(origin)) return cb(null, true);
-      cb(null, false);
-    },
+    origin: allowedOrigins,
     credentials: true,
   })
 );
