@@ -12,5 +12,12 @@ export const useUserStore = defineStore('user', () => {
     total.value = data.total;
   }
 
-  return { users, total, fetchUsers };
+  async function createUser(payload) {
+    const { data } = await api.post('/api/users', payload);
+    users.value.unshift(data.data);
+    total.value++;
+    return data.data;
+  }
+
+  return { users, total, fetchUsers, createUser };
 });

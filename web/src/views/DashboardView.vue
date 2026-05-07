@@ -6,6 +6,7 @@ import { useUserStore } from '@/stores/user';
 import { useAnalyticsStore } from '@/stores/analytics';
 import { useQuestionStore } from '@/stores/question';
 import { useCategoryStore } from '@/stores/category';
+import { useDepartmentStore } from '@/stores/department';
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -13,10 +14,11 @@ const userStore = useUserStore();
 const analyticsStore = useAnalyticsStore();
 const questionStore = useQuestionStore();
 const categoryStore = useCategoryStore();
+const departmentStore = useDepartmentStore();
 
 const DEPT_COLORS = ['#2E7D7A', '#5FB7C1', '#95D5D0', '#B2E0DD', '#E8F4F8', '#3DBDB0', '#1A5F5C'];
 const ACCENT_CYCLE = ['teal', 'blue', 'coral'];
-const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E'];
+const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 const tabs = [
   { id: 'Anasayfa', icon: '🏠' },
@@ -38,20 +40,62 @@ const createStepsPreview = [
   { title: 'Taslakla', icon: '···' },
 ];
 
+// ─── UI state ──────────────────────────────────────────────────────────────
 const activeTab = ref('Anasayfa');
 const loading = ref(true);
 const error = ref('');
 const questionLoading = ref(false);
 
-// Personeller
+// ─── Personeller ───────────────────────────────────────────────────────────
 const search = ref('');
 const deptFilter = ref('Tümü');
 
-// Test Oluşturma
+// ─── Wizard step 1 ─────────────────────────────────────────────────────────
 const wizardStep = ref(1);
 const testTitle = ref('');
 const testCategoryId = ref('');
+const testType = ref('multiple_choice');
+const testDifficulty = ref(3);
+const step1Error = ref('');
+
+// ─── Wizard step 2 ─────────────────────────────────────────────────────────
+const selectedQuestionIds = ref([]);
+const showAddQuestionForm = ref(false);
+const addQuestionLoading = ref(false);
+const addQuestionError = ref('');
+const newQuestion = ref(defaultQuestion());
+
+function defaultQuestion() {
+  return {
+    text: '',
+    type: 'multiple_choice',
+    difficulty: 3,
+    options: [
+      { text: '', isCorrect: true, order: 0 },
+      { text: '', isCorrect: false, order: 1 },
+      { text: '', isCorrect: false, order: 2 },
+      { text: '', isCorrect: false, order: 3 },
+    ],
+  };
+}
+
+// ─── Wizard step 3 ─────────────────────────────────────────────────────────
 const selectedEmployeeIds = ref([]);
+const step3Error = ref('');
+const publishSuccess = ref(false);
+const publishedTestName = ref('');
+
+// ─── Employee add modal ────────────────────────────────────────────────────
+const showAddEmployeeModal = ref(false);
+const addEmployeeLoading = ref(false);
+const addEmployeeError = ref('');
+const newEmployee = ref(defaultEmployee());
+
+function defaultEmployee() {
+  return { fullName: '', email: '', password: '', role: 'employee', departmentId: '' };
+}
+
+// ─── Computed ──────────────────────────────────────────────────────────────
 
 const employees = computed(() =>
   userStore.users.map((u, i) => ({
@@ -119,6 +163,22 @@ const reportCards = computed(() => {
 
 const overviewStats = computed(() => analyticsStore.overview?.sessionStats ?? {});
 
+const selectedCategoryName = computed(() => {
+  if (!testCategoryId.value) return '—';
+  return categoryStore.categories.find((c) => c._id === testCategoryId.value)?.name ?? '—';
+});
+
+const filteredQuestions = computed(() => {
+  if (!testCategoryId.value) return questionStore.questions;
+  return questionStore.questions.filter(
+    (q) => (q.categoryId?._id ?? q.categoryId) === testCategoryId.value
+  );
+});
+
+const TYPE_LABELS = { multiple_choice: 'Çoktan Seçmeli', true_false: 'Doğru / Yanlış' };
+
+// ─── Chart helpers ─────────────────────────────────────────────────────────
+
 function donutStroke(item) {
   const circ = 314;
   const total = totalDepartment.value || 1;
@@ -149,7 +209,13 @@ function linePoints(values) {
   return values.map((v, i) => `${i * stepX},${height - (v / max) * 105 - 10}`).join(' ');
 }
 
+// ─── Wizard navigation ─────────────────────────────────────────────────────
+
 function nextStep() {
+  if (wizardStep.value === 1) {
+    if (!testTitle.value.trim()) { step1Error.value = 'Test başlığı zorunludur.'; return; }
+    step1Error.value = '';
+  }
   if (wizardStep.value < 3) wizardStep.value++;
 }
 
@@ -157,10 +223,145 @@ function prevStep() {
   if (wizardStep.value > 1) wizardStep.value--;
 }
 
+function resetWizard() {
+  testTitle.value = '';
+  testCategoryId.value = '';
+  testType.value = 'multiple_choice';
+  testDifficulty.value = 3;
+  step1Error.value = '';
+  step3Error.value = '';
+  selectedEmployeeIds.value = [];
+  selectedQuestionIds.value = [];
+  showAddQuestionForm.value = false;
+  newQuestion.value = defaultQuestion();
+  publishSuccess.value = false;
+  wizardStep.value = 1;
+}
+
+function publishTest() {
+  if (!selectedEmployeeIds.value.length) {
+    step3Error.value = 'En az bir personel seçin.';
+    return;
+  }
+  step3Error.value = '';
+  publishedTestName.value = testTitle.value;
+  publishSuccess.value = true;
+}
+
+// ─── Question form helpers ──────────────────────────────────────────────────
+
+function setCorrectOption(index) {
+  newQuestion.value.options.forEach((o, i) => (o.isCorrect = i === index));
+}
+
+function addQuestionOption() {
+  if (newQuestion.value.options.length >= 6) return;
+  const len = newQuestion.value.options.length;
+  newQuestion.value.options.push({ text: '', isCorrect: false, order: len });
+}
+
+function removeQuestionOption(index) {
+  newQuestion.value.options.splice(index, 1);
+  newQuestion.value.options.forEach((o, i) => (o.order = i));
+  if (!newQuestion.value.options.some((o) => o.isCorrect)) {
+    newQuestion.value.options[0].isCorrect = true;
+  }
+}
+
+function onQuestionTypeChange() {
+  if (newQuestion.value.type === 'true_false') {
+    newQuestion.value.options = [
+      { text: 'Doğru', isCorrect: true, order: 0 },
+      { text: 'Yanlış', isCorrect: false, order: 1 },
+    ];
+  } else {
+    newQuestion.value.options = [
+      { text: '', isCorrect: true, order: 0 },
+      { text: '', isCorrect: false, order: 1 },
+      { text: '', isCorrect: false, order: 2 },
+      { text: '', isCorrect: false, order: 3 },
+    ];
+  }
+}
+
+function toggleQuestion(id) {
+  const idx = selectedQuestionIds.value.indexOf(id);
+  if (idx >= 0) selectedQuestionIds.value.splice(idx, 1);
+  else selectedQuestionIds.value.push(id);
+}
+
+function isQuestionSelected(id) {
+  return selectedQuestionIds.value.includes(id);
+}
+
+async function submitAddQuestion() {
+  addQuestionError.value = '';
+  if (!testCategoryId.value) {
+    addQuestionError.value = "Lütfen önce Adım 1'den bir kategori seçin.";
+    return;
+  }
+  if (!newQuestion.value.text.trim()) {
+    addQuestionError.value = 'Soru metni boş bırakılamaz.';
+    return;
+  }
+  if (newQuestion.value.options.some((o) => !o.text.trim())) {
+    addQuestionError.value = 'Tüm seçenekleri doldurun.';
+    return;
+  }
+  addQuestionLoading.value = true;
+  try {
+    const q = await questionStore.createQuestion({
+      categoryId: testCategoryId.value,
+      text: newQuestion.value.text,
+      type: newQuestion.value.type,
+      difficulty: newQuestion.value.difficulty,
+      options: newQuestion.value.options,
+    });
+    selectedQuestionIds.value.push(q._id);
+    showAddQuestionForm.value = false;
+    newQuestion.value = defaultQuestion();
+  } catch (err) {
+    addQuestionError.value = err.response?.data?.message ?? 'Soru kaydedilemedi.';
+  } finally {
+    addQuestionLoading.value = false;
+  }
+}
+
+// ─── Employee modal helpers ─────────────────────────────────────────────────
+
+function openAddEmployeeModal() {
+  newEmployee.value = defaultEmployee();
+  addEmployeeError.value = '';
+  showAddEmployeeModal.value = true;
+}
+
+async function submitAddEmployee() {
+  addEmployeeError.value = '';
+  addEmployeeLoading.value = true;
+  try {
+    await userStore.createUser({
+      fullName: newEmployee.value.fullName,
+      email: newEmployee.value.email,
+      password: newEmployee.value.password,
+      role: newEmployee.value.role,
+      ...(newEmployee.value.departmentId && { departmentId: newEmployee.value.departmentId }),
+    });
+    showAddEmployeeModal.value = false;
+  } catch (err) {
+    addEmployeeError.value = err.response?.data?.message ?? 'Personel eklenirken hata oluştu.';
+  } finally {
+    addEmployeeLoading.value = false;
+  }
+}
+
+// ─── Auth ──────────────────────────────────────────────────────────────────
+
 async function logout() {
   auth.logout();
   router.push('/login');
 }
+
+// ─── Watchers ──────────────────────────────────────────────────────────────
 
 watch(activeTab, async (tab) => {
   if (tab === 'Test Oluşturma' && !questionStore.questions.length) {
@@ -173,6 +374,8 @@ watch(activeTab, async (tab) => {
   }
 });
 
+// ─── Lifecycle ─────────────────────────────────────────────────────────────
+
 onMounted(async () => {
   try {
     await Promise.all([
@@ -180,6 +383,7 @@ onMounted(async () => {
       userStore.fetchUsers({ limit: 20 }),
       analyticsStore.fetchOverview(),
       analyticsStore.fetchDepartments(),
+      departmentStore.fetchDepartments(),
     ]);
   } catch {
     error.value = 'Veriler yüklenirken bir hata oluştu.';
@@ -194,6 +398,7 @@ onMounted(async () => {
     <div class="ambient ambient-left"></div>
     <div class="ambient ambient-right"></div>
 
+    <!-- ── Header ── -->
     <div class="page-top">
       <header class="topbar">
         <p class="eyebrow">İK Analiz</p>
@@ -228,7 +433,7 @@ onMounted(async () => {
 
     <main v-else class="dashboard">
 
-      <!-- ═══════════════ ANASAYFA ═══════════════ -->
+      <!-- ══════════════════════ ANASAYFA ══════════════════════ -->
       <template v-if="activeTab === 'Anasayfa'">
         <section class="hero card-surface">
           <div class="hero-art">
@@ -392,123 +597,303 @@ onMounted(async () => {
         </section>
       </template>
 
-      <!-- ═══════════════ TEST OLUŞTURMA ═══════════════ -->
+      <!-- ══════════════════════ TEST OLUŞTURMA ══════════════════════ -->
       <template v-else-if="activeTab === 'Test Oluşturma'">
-        <div class="wizard-stepper card-surface">
-          <template v-for="(step, i) in wizardSteps" :key="step.id">
-            <span
-              class="stepper-label"
-              :class="{
-                active: wizardStep === step.id,
-                done: wizardStep > step.id,
-              }"
-            >{{ step.label }}</span>
-            <span v-if="i < wizardSteps.length - 1" class="stepper-sep">›</span>
-          </template>
+
+        <!-- Success state -->
+        <div v-if="publishSuccess" class="success-card card-surface">
+          <div class="success-icon">✓</div>
+          <h2>Test başarıyla oluşturuldu!</h2>
+          <p class="section-text" style="text-align:center;margin:0 auto 4px;">
+            <strong>{{ publishedTestName }}</strong> ·
+            {{ selectedQuestionIds.length }} soru ·
+            {{ selectedEmployeeIds.length }} personel
+          </p>
+          <div class="step-actions" style="justify-content:center;margin-top:28px;">
+            <button class="secondary-btn" type="button" @click="activeTab = 'Anasayfa'">Anasayfa'ya Dön</button>
+            <button class="primary-btn" type="button" @click="resetWizard">Yeni Test Oluştur</button>
+          </div>
         </div>
 
-        <!-- Step 1: Tür & Ayarlar -->
-        <section v-if="wizardStep === 1" class="step-form card-surface">
-          <h2>Test Türü ve Ayarları</h2>
-          <div class="step-fields">
-            <div class="field-group">
-              <label class="field-label">Test Başlığı</label>
-              <input
-                v-model="testTitle"
-                class="field-input"
-                type="text"
-                placeholder="örn. Q3 Teknik Değerlendirme"
-              />
-            </div>
-            <div class="field-group">
-              <label class="field-label">Kategori</label>
-              <select v-model="testCategoryId" class="field-select">
-                <option value="">Kategori seçin…</option>
-                <option v-for="cat in categoryStore.categories" :key="cat._id" :value="cat._id">
-                  {{ cat.name }}
-                </option>
-              </select>
-            </div>
+        <template v-else>
+          <!-- Stepper -->
+          <div class="wizard-stepper card-surface">
+            <template v-for="(step, i) in wizardSteps" :key="step.id">
+              <span
+                class="stepper-label"
+                :class="{ active: wizardStep === step.id, done: wizardStep > step.id }"
+              >{{ step.label }}</span>
+              <span v-if="i < wizardSteps.length - 1" class="stepper-sep">›</span>
+            </template>
           </div>
-          <div class="step-actions">
-            <button class="primary-btn" type="button" @click="nextStep">Sonraki Adım</button>
-          </div>
-        </section>
 
-        <!-- Step 2: Sorular -->
-        <section v-else-if="wizardStep === 2">
-          <div v-if="questionLoading" class="page-loading"><div class="spinner"></div></div>
-          <div v-else class="test-create-layout">
-            <div class="test-create-questions">
-              <div v-if="!questionStore.questions.length" class="empty-state card-surface" style="border-radius:20px;padding:40px;">
-                <p>Henüz soru bulunmuyor. İlk soruyu ekleyin.</p>
+          <!-- ── Step 1: Tür & Ayarlar ── -->
+          <section v-if="wizardStep === 1" class="step-form card-surface">
+            <h2>Test Türü ve Ayarları</h2>
+            <div class="step-fields">
+              <div class="field-group">
+                <label class="field-label">Test Başlığı *</label>
+                <input
+                  v-model="testTitle"
+                  class="field-input"
+                  type="text"
+                  placeholder="örn. Q3 Teknik Değerlendirme"
+                />
               </div>
-              <div v-else class="question-flow">
-                <div v-for="(q, i) in questionStore.questions" :key="q._id" class="question-row">
-                  <div class="q-left">
-                    <div class="question-num-badge">{{ i + 1 }}</div>
-                    <div v-if="i < questionStore.questions.length" class="q-connector"></div>
-                  </div>
-                  <div class="question-card card-surface">
-                    <h3>{{ q.categoryId?.name ?? 'Soru' }} {{ i + 1 }}</h3>
-                    <p class="question-body">{{ q.text }}</p>
-                    <div class="question-options">
-                      <div v-for="(opt, j) in q.options" :key="j" class="option-row">
-                        <span class="option-label-badge">{{ OPTION_LABELS[j] }}</span>
-                        <span class="option-text-bar">{{ opt.text }}</span>
+              <div class="field-group">
+                <label class="field-label">Kategori</label>
+                <select v-model="testCategoryId" class="field-select">
+                  <option value="">Kategori seçin…</option>
+                  <option v-for="cat in categoryStore.categories" :key="cat._id" :value="cat._id">
+                    {{ cat.name }}
+                  </option>
+                </select>
+              </div>
+              <div class="field-row-2">
+                <div class="field-group">
+                  <label class="field-label">Test Türü</label>
+                  <select v-model="testType" class="field-select">
+                    <option value="multiple_choice">Çoktan Seçmeli</option>
+                    <option value="true_false">Doğru / Yanlış</option>
+                  </select>
+                </div>
+                <div class="field-group">
+                  <label class="field-label">Zorluk Seviyesi</label>
+                  <select v-model.number="testDifficulty" class="field-select">
+                    <option :value="1">1 — Çok Kolay</option>
+                    <option :value="2">2 — Kolay</option>
+                    <option :value="3">3 — Orta</option>
+                    <option :value="4">4 — Zor</option>
+                    <option :value="5">5 — Çok Zor</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <p v-if="step1Error" class="form-error">{{ step1Error }}</p>
+            <div class="step-actions">
+              <button class="primary-btn" type="button" @click="nextStep">Sonraki Adım</button>
+            </div>
+          </section>
+
+          <!-- ── Step 2: Sorular ── -->
+          <section v-else-if="wizardStep === 2">
+            <div v-if="questionLoading" class="page-loading"><div class="spinner"></div></div>
+            <div v-else class="test-create-layout">
+
+              <!-- Questions column -->
+              <div class="test-create-questions">
+                <div
+                  v-if="!filteredQuestions.length && !showAddQuestionForm"
+                  class="empty-state card-surface"
+                  style="border-radius:20px;padding:40px;"
+                >
+                  <p>Bu kategoride henüz soru yok. Aşağıdan ilk soruyu oluşturun.</p>
+                </div>
+
+                <div class="question-flow">
+                  <!-- Existing questions -->
+                  <div v-for="(q, i) in filteredQuestions" :key="q._id" class="question-row">
+                    <div class="q-left">
+                      <div
+                        class="question-num-badge"
+                        :class="{ 'q-badge-selected': isQuestionSelected(q._id) }"
+                      >{{ i + 1 }}</div>
+                      <div class="q-connector"></div>
+                    </div>
+                    <div
+                      class="question-card card-surface"
+                      :class="{ 'q-card-selected': isQuestionSelected(q._id) }"
+                    >
+                      <div class="question-card-header">
+                        <h3>{{ q.categoryId?.name ?? 'Soru' }} {{ i + 1 }}</h3>
+                        <button
+                          class="question-select-toggle"
+                          :class="{ selected: isQuestionSelected(q._id) }"
+                          type="button"
+                          @click="toggleQuestion(q._id)"
+                        >
+                          {{ isQuestionSelected(q._id) ? '✓ Eklendi' : '+ Ekle' }}
+                        </button>
+                      </div>
+                      <p class="question-body">{{ q.text }}</p>
+                      <div class="question-options">
+                        <div v-for="(opt, j) in q.options" :key="j" class="option-row">
+                          <span class="option-label-badge" :class="{ 'opt-correct': opt.isCorrect }">{{ OPTION_LABELS[j] }}</span>
+                          <span class="option-text-bar">{{ opt.text }}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                <div class="question-row">
-                  <div class="q-left">
-                    <div class="question-num-badge add-badge">?</div>
+                  <!-- Inline add-question form -->
+                  <div v-if="showAddQuestionForm" class="question-row">
+                    <div class="q-left">
+                      <div class="question-num-badge add-badge">+</div>
+                    </div>
+                    <div class="add-question-form card-surface">
+                      <p class="form-section-title">Yeni Soru Oluştur</p>
+                      <div class="field-group">
+                        <label class="field-label">Soru Metni</label>
+                        <textarea
+                          v-model="newQuestion.text"
+                          class="field-textarea"
+                          rows="3"
+                          placeholder="Soruyu buraya yazın…"
+                        ></textarea>
+                      </div>
+                      <div class="field-row-2">
+                        <div class="field-group">
+                          <label class="field-label">Soru Türü</label>
+                          <select v-model="newQuestion.type" class="field-select" @change="onQuestionTypeChange">
+                            <option value="multiple_choice">Çoktan Seçmeli</option>
+                            <option value="true_false">Doğru / Yanlış</option>
+                          </select>
+                        </div>
+                        <div class="field-group">
+                          <label class="field-label">Zorluk (1–5)</label>
+                          <select v-model.number="newQuestion.difficulty" class="field-select">
+                            <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="options-editor">
+                        <label class="field-label">
+                          Seçenekler
+                          <span class="label-hint"> — ● doğru cevabı işaretleyin</span>
+                        </label>
+                        <div v-for="(opt, i) in newQuestion.options" :key="i" class="option-editor-row">
+                          <input
+                            type="radio"
+                            name="correct-opt"
+                            :checked="opt.isCorrect"
+                            :disabled="newQuestion.type === 'true_false'"
+                            @change="setCorrectOption(i)"
+                          />
+                          <span class="option-label-badge">{{ OPTION_LABELS[i] }}</span>
+                          <input
+                            v-model="opt.text"
+                            class="field-input option-text-input"
+                            type="text"
+                            :placeholder="`${OPTION_LABELS[i]} seçeneği…`"
+                            :disabled="newQuestion.type === 'true_false'"
+                          />
+                          <button
+                            v-if="newQuestion.type === 'multiple_choice' && newQuestion.options.length > 2"
+                            class="remove-opt-btn"
+                            type="button"
+                            title="Seçeneği sil"
+                            @click="removeQuestionOption(i)"
+                          >✕</button>
+                        </div>
+                        <button
+                          v-if="newQuestion.type === 'multiple_choice' && newQuestion.options.length < 6"
+                          class="add-opt-btn"
+                          type="button"
+                          @click="addQuestionOption"
+                        >+ Seçenek Ekle</button>
+                      </div>
+                      <p v-if="addQuestionError" class="form-error">{{ addQuestionError }}</p>
+                      <div class="step-actions">
+                        <button
+                          class="secondary-btn"
+                          type="button"
+                          @click="showAddQuestionForm = false; addQuestionError = ''"
+                        >İptal</button>
+                        <button
+                          class="primary-btn"
+                          type="button"
+                          :disabled="addQuestionLoading"
+                          @click="submitAddQuestion"
+                        >
+                          {{ addQuestionLoading ? 'Kaydediliyor…' : 'Soruyu Kaydet' }}
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div class="add-question-card card-surface">
-                    <span class="add-icon-lg">+</span>
+
+                  <!-- Add question trigger card -->
+                  <div v-if="!showAddQuestionForm" class="question-row">
+                    <div class="q-left">
+                      <div class="question-num-badge add-badge">?</div>
+                    </div>
+                    <div class="add-question-card card-surface" @click="showAddQuestionForm = true">
+                      <span class="add-icon-lg">+</span>
+                      <span class="add-question-label">Yeni Soru Ekle</span>
+                    </div>
                   </div>
                 </div>
               </div>
+
+              <!-- Sidebar: test summary -->
+              <aside class="test-create-sidebar card-surface">
+                <p class="sidebar-title">Test Özeti</p>
+                <div class="sidebar-summary">
+                  <div class="sidebar-stat">
+                    <span class="sidebar-stat-label">Başlık</span>
+                    <span class="sidebar-stat-value">{{ testTitle || '—' }}</span>
+                  </div>
+                  <div class="sidebar-stat">
+                    <span class="sidebar-stat-label">Kategori</span>
+                    <span class="sidebar-stat-value">{{ selectedCategoryName }}</span>
+                  </div>
+                  <div class="sidebar-stat">
+                    <span class="sidebar-stat-label">Tür</span>
+                    <span class="sidebar-stat-value">{{ TYPE_LABELS[testType] }}</span>
+                  </div>
+                  <div class="sidebar-stat">
+                    <span class="sidebar-stat-label">Zorluk</span>
+                    <span class="sidebar-stat-value">{{ testDifficulty }} / 5</span>
+                  </div>
+                  <div class="sidebar-stat sidebar-stat-highlight">
+                    <span class="sidebar-stat-label">Seçilen Soru</span>
+                    <strong class="sidebar-stat-count">{{ selectedQuestionIds.length }}</strong>
+                  </div>
+                </div>
+              </aside>
             </div>
 
-            <div class="test-create-sidebar card-surface"></div>
-          </div>
+            <div class="step-actions">
+              <button class="secondary-btn" type="button" @click="prevStep">Önceki Adım</button>
+              <button class="primary-btn" type="button" @click="nextStep">Sonraki Adım</button>
+            </div>
+          </section>
 
-          <div class="step-actions">
-            <button class="secondary-btn" type="button" @click="prevStep">Önceki Adım</button>
-            <button class="primary-btn" type="button" @click="nextStep">Sonraki Adım</button>
-          </div>
-        </section>
-
-        <!-- Step 3: Atama & Yayınlama -->
-        <section v-else-if="wizardStep === 3" class="step-form card-surface">
-          <h2>Personel Atama ve Yayınlama</h2>
-          <p class="section-text">Testi atamak istediğiniz personelleri seçin.</p>
-          <div class="employee-select-grid">
-            <label
-              v-for="emp in employees"
-              :key="emp.id"
-              class="employee-select-item"
-            >
-              <input type="checkbox" :value="emp.id" v-model="selectedEmployeeIds" />
-              <div class="employee-select-info">
-                <div class="employee-avatar small">{{ emp.initial }}</div>
-                <div>
-                  <strong>{{ emp.name }}</strong>
-                  <p>{{ emp.dept }}</p>
+          <!-- ── Step 3: Atama & Yayınlama ── -->
+          <section v-else-if="wizardStep === 3" class="step-form card-surface">
+            <h2>Personel Atama ve Yayınlama</h2>
+            <p class="section-text">Testi atamak istediğiniz personelleri seçin.</p>
+            <div class="employee-select-grid">
+              <label
+                v-for="emp in employees"
+                :key="emp.id"
+                class="employee-select-item"
+                :class="{ 'item-checked': selectedEmployeeIds.includes(emp.id) }"
+              >
+                <input type="checkbox" :value="emp.id" v-model="selectedEmployeeIds" />
+                <div class="employee-select-info">
+                  <div class="employee-avatar small">{{ emp.initial }}</div>
+                  <div>
+                    <strong>{{ emp.name }}</strong>
+                    <p>{{ emp.dept }}</p>
+                  </div>
                 </div>
-              </div>
-            </label>
-          </div>
-          <div class="step-actions">
-            <button class="secondary-btn" type="button" @click="prevStep">Önceki Adım</button>
-            <button class="primary-btn" type="button">Testi Yayınla</button>
-          </div>
-        </section>
+              </label>
+            </div>
+            <p v-if="step3Error" class="form-error" style="margin-top:12px;">{{ step3Error }}</p>
+            <div v-if="selectedEmployeeIds.length" class="publish-summary">
+              <span>{{ selectedQuestionIds.length }} soru</span>
+              <span class="publish-sep">·</span>
+              <span>{{ selectedEmployeeIds.length }} personel seçildi</span>
+            </div>
+            <div class="step-actions">
+              <button class="secondary-btn" type="button" @click="prevStep">Önceki Adım</button>
+              <button class="primary-btn" type="button" @click="publishTest">Testi Yayınla 🚀</button>
+            </div>
+          </section>
+        </template>
       </template>
 
-      <!-- ═══════════════ PERSONELLER ═══════════════ -->
+      <!-- ══════════════════════ PERSONELLER ══════════════════════ -->
       <template v-else-if="activeTab === 'Personeller'">
         <div class="personnel-overview-grid">
           <div class="stats-summary-card card-surface">
@@ -589,7 +974,7 @@ onMounted(async () => {
                 </select>
               </div>
             </div>
-            <button class="primary-btn add-personnel-btn" type="button">
+            <button class="primary-btn add-personnel-btn" type="button" @click="openAddEmployeeModal">
               Yeni Personel Ekle +
             </button>
           </div>
@@ -625,7 +1010,7 @@ onMounted(async () => {
         </section>
       </template>
 
-      <!-- ═══════════════ ANALİZLER ═══════════════ -->
+      <!-- ══════════════════════ ANALİZLER ══════════════════════ -->
       <template v-else-if="activeTab === 'Analizler'">
         <section class="section-block">
           <div class="section-title-row">
@@ -686,6 +1071,79 @@ onMounted(async () => {
       </template>
 
     </main>
+
+    <!-- ══════════════════════ EMPLOYEE ADD MODAL ══════════════════════ -->
+    <div v-if="showAddEmployeeModal" class="modal-overlay" @click.self="showAddEmployeeModal = false">
+      <div class="modal-card card-surface">
+        <div class="modal-header">
+          <h2>Yeni Personel Ekle</h2>
+          <button class="modal-close" type="button" @click="showAddEmployeeModal = false">✕</button>
+        </div>
+        <form @submit.prevent="submitAddEmployee">
+          <div class="step-fields">
+            <div class="field-group">
+              <label class="field-label">Ad Soyad *</label>
+              <input
+                v-model="newEmployee.fullName"
+                class="field-input"
+                type="text"
+                placeholder="Ahmet Yılmaz"
+                required
+              />
+            </div>
+            <div class="field-group">
+              <label class="field-label">E-posta *</label>
+              <input
+                v-model="newEmployee.email"
+                class="field-input"
+                type="email"
+                placeholder="ahmet@sirket.com"
+                required
+              />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Şifre *</label>
+              <input
+                v-model="newEmployee.password"
+                class="field-input"
+                type="password"
+                placeholder="Minimum 8 karakter"
+                minlength="8"
+                required
+              />
+            </div>
+            <div class="field-row-2">
+              <div class="field-group">
+                <label class="field-label">Departman</label>
+                <select v-model="newEmployee.departmentId" class="field-select">
+                  <option value="">Seçiniz (opsiyonel)</option>
+                  <option
+                    v-for="dept in departmentStore.departments"
+                    :key="dept._id"
+                    :value="dept._id"
+                  >{{ dept.name }}</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Rol</label>
+                <select v-model="newEmployee.role" class="field-select">
+                  <option value="employee">Personel</option>
+                  <option value="hr">İK Direktörü</option>
+                  <option value="admin">Yönetici</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <p v-if="addEmployeeError" class="form-error" style="margin-top:12px;">{{ addEmployeeError }}</p>
+          <div class="modal-actions">
+            <button class="secondary-btn" type="button" @click="showAddEmployeeModal = false">İptal</button>
+            <button class="primary-btn" type="submit" :disabled="addEmployeeLoading">
+              {{ addEmployeeLoading ? 'Ekleniyor…' : 'Personel Ekle' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
 
     <footer class="footer">Copyright İK Analiz {{ new Date().getFullYear() }}</footer>
   </div>

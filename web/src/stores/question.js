@@ -12,5 +12,12 @@ export const useQuestionStore = defineStore('question', () => {
     total.value = data.total;
   }
 
-  return { questions, total, fetchQuestions };
+  async function createQuestion(payload) {
+    const { data } = await api.post('/api/questions', payload);
+    questions.value.unshift(data.data);
+    total.value++;
+    return data.data;
+  }
+
+  return { questions, total, fetchQuestions, createQuestion };
 });
