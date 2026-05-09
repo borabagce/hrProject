@@ -301,6 +301,7 @@ async function publishTest() {
     await testStore.assignTest(test._id, selectedEmployeeIds.value);
     publishedTestName.value = testTitle.value;
     publishSuccess.value = true;
+    setTimeout(() => resetWizard(), 2500);
   } catch (err) {
     step3Error.value = err.response?.data?.message ?? 'Test oluşturulamadı, tekrar deneyin.';
   } finally {
