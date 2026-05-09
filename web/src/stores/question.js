@@ -9,7 +9,7 @@ export const useQuestionStore = defineStore('question', () => {
   async function fetchQuestions(params = {}) {
     const { data } = await api.get('/api/questions', { params: { limit: 20, ...params } });
     questions.value = data.data;
-    total.value = data.total;
+    total.value = data.meta?.total ?? data.data.length;
   }
 
   async function createQuestion(payload) {
@@ -19,5 +19,18 @@ export const useQuestionStore = defineStore('question', () => {
     return data.data;
   }
 
-  return { questions, total, fetchQuestions, createQuestion };
+  async function updateQuestion(id, payload) {
+    const { data } = await api.put(`/api/questions/${id}`, payload);
+    const idx = questions.value.findIndex((q) => q._id === id);
+    if (idx >= 0) questions.value[idx] = data.data;
+    return data.data;
+  }
+
+  async function deleteQuestion(id) {
+    await api.delete(`/api/questions/${id}`);
+    questions.value = questions.value.filter((q) => q._id !== id);
+    if (total.value > 0) total.value--;
+  }
+
+  return { questions, total, fetchQuestions, createQuestion, updateQuestion, deleteQuestion };
 });

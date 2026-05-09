@@ -671,7 +671,6 @@ a {
 .donut-svg {
   width: 160px;
   height: 160px;
-  transform: rotate(-90deg);
 }
 
 .donut-track,
@@ -1153,8 +1152,10 @@ a {
 }
 
 .add-question-card {
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   min-height: 110px;
   border-radius: 18px;
   border: 2px dashed rgba(46, 125, 122, 0.2) !important;
@@ -1239,7 +1240,6 @@ a {
 .mini-donut-svg {
   width: 76px;
   height: 76px;
-  transform: rotate(-90deg);
   flex-shrink: 0;
 }
 
@@ -1683,15 +1683,6 @@ a {
   color: #388e3c !important;
 }
 
-/* ── ADD QUESTION CARD (enhanced) ── */
-.add-question-card {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-height: 72px;
-}
-
 .add-question-label {
   color: rgba(46, 125, 122, 0.5);
   font-size: 0.9rem;
@@ -1752,6 +1743,128 @@ a {
   color: var(--teal);
   line-height: 1;
 }
+
+/* ── ANALIZLER TAB ── */
+.analytics-overview-card {
+  padding: 24px;
+  border-radius: 26px;
+}
+
+.analytics-stats-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.analytics-stats-row .stat-chip {
+  flex: 1;
+  min-width: 120px;
+}
+
+.wrong-questions-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.wrong-question-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(46, 125, 122, 0.1);
+}
+
+.wq-rank {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--teal);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.wq-text {
+  flex: 1;
+  font-size: 0.88rem;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wq-count {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--pink);
+  flex-shrink: 0;
+}
+
+.report-gen-form {
+  display: grid;
+  gap: 16px;
+}
+
+.reports-list {
+  display: grid;
+  gap: 10px;
+}
+
+.report-list-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(46, 125, 122, 0.1);
+}
+
+.report-type-chip {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(46, 125, 122, 0.1);
+  color: var(--teal);
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.report-list-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.report-list-meta strong {
+  display: block;
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+
+.report-list-meta p {
+  margin: 3px 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.risk-badge {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.risk-low { background: rgba(76, 175, 80, 0.14); color: #388e3c; }
+.risk-medium { background: rgba(255, 152, 0, 0.14); color: #e65100; }
+.risk-high { background: rgba(233, 30, 140, 0.12); color: var(--pink); }
 
 /* ── PUBLISH SUMMARY ── */
 .publish-summary {

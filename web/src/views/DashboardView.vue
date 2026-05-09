@@ -162,6 +162,19 @@ const reportCards = computed(() => {
 });
 
 const overviewStats = computed(() => analyticsStore.overview?.sessionStats ?? {});
+const topWrongQuestions = computed(() => analyticsStore.overview?.topWrongQuestions ?? []);
+
+const REPORT_TYPE_LABELS = {
+  weekly_summary: 'Haftalık Özet',
+  monthly_summary: 'Aylık Özet',
+  risk_assessment: 'Risk Değerlendirmesi',
+};
+const RISK_LABELS = { low: 'Düşük', medium: 'Orta', high: 'Yüksek' };
+
+// ─── Analytics / Reports state ─────────────────────────────────────────────
+const reportGenerating = ref(false);
+const reportError = ref('');
+const reportForm = ref({ reportType: 'weekly_summary', periodStart: '', periodEnd: '' });
 
 const selectedCategoryName = computed(() => {
   if (!testCategoryId.value) return '—';
@@ -179,21 +192,27 @@ const TYPE_LABELS = { multiple_choice: 'Çoktan Seçmeli', true_false: 'Doğru /
 
 // ─── Chart helpers ─────────────────────────────────────────────────────────
 
-function donutStroke(item) {
+function donutStroke(item, index) {
   const circ = 314;
-  const total = totalDepartment.value || 1;
+  const total = departmentData.value.reduce((s, d) => s + d.value, 0) || 1;
+  const dashLen = (circ * item.value) / total;
+  const prevTotal = departmentData.value.slice(0, index).reduce((s, d) => s + d.value, 0);
+  const startAngle = (prevTotal / total) * 360 - 90;
   return {
-    strokeDasharray: `${circ} ${circ}`,
-    strokeDashoffset: circ - (circ * item.value) / total,
+    style: { strokeDasharray: `${dashLen} ${circ - dashLen}` },
+    transform: `rotate(${startAngle}, 60, 60)`,
   };
 }
 
-function miniDonutStroke(item) {
+function miniDonutStroke(item, index) {
   const circ = 2 * Math.PI * 32;
-  const total = totalDepartment.value || 1;
+  const total = departmentData.value.reduce((s, d) => s + d.value, 0) || 1;
+  const dashLen = (circ * item.value) / total;
+  const prevTotal = departmentData.value.slice(0, index).reduce((s, d) => s + d.value, 0);
+  const startAngle = (prevTotal / total) * 360 - 90;
   return {
-    strokeDasharray: `${circ} ${circ}`,
-    strokeDashoffset: circ - (circ * item.value) / total,
+    style: { strokeDasharray: `${dashLen} ${circ - dashLen}` },
+    transform: `rotate(${startAngle}, 40, 40)`,
   };
 }
 
@@ -239,6 +258,10 @@ function resetWizard() {
 }
 
 function publishTest() {
+  if (!selectedQuestionIds.value.length) {
+    step3Error.value = 'En az bir soru seçmelisiniz.';
+    return;
+  }
   if (!selectedEmployeeIds.value.length) {
     step3Error.value = 'En az bir personel seçin.';
     return;
@@ -246,6 +269,28 @@ function publishTest() {
   step3Error.value = '';
   publishedTestName.value = testTitle.value;
   publishSuccess.value = true;
+}
+
+async function submitGenerateReport() {
+  reportError.value = '';
+  if (!reportForm.value.periodStart || !reportForm.value.periodEnd) {
+    reportError.value = 'Dönem başlangıç ve bitiş tarihleri zorunludur.';
+    return;
+  }
+  if (new Date(reportForm.value.periodStart) >= new Date(reportForm.value.periodEnd)) {
+    reportError.value = 'Başlangıç tarihi bitiş tarihinden önce olmalıdır.';
+    return;
+  }
+  reportGenerating.value = true;
+  try {
+    await analyticsStore.generateReport(reportForm.value);
+    reportForm.value.periodStart = '';
+    reportForm.value.periodEnd = '';
+  } catch (err) {
+    reportError.value = err.response?.data?.message ?? 'Rapor oluşturulamadı.';
+  } finally {
+    reportGenerating.value = false;
+  }
 }
 
 // ─── Question form helpers ──────────────────────────────────────────────────
@@ -371,6 +416,10 @@ watch(activeTab, async (tab) => {
     } finally {
       questionLoading.value = false;
     }
+  } else if (tab === 'Analizler') {
+    try {
+      await Promise.all([analyticsStore.listReports(), analyticsStore.fetchQuestionAnalytics()]);
+    } catch { /* non-critical */ }
   }
 });
 
@@ -551,12 +600,12 @@ onMounted(async () => {
                 <svg viewBox="0 0 120 120" class="donut-svg">
                   <circle cx="60" cy="60" r="50" class="donut-track"></circle>
                   <circle
-                    v-for="item in departmentData"
+                    v-for="(item, i) in departmentData"
                     :key="item.name"
                     cx="60" cy="60" r="50"
                     class="donut-segment"
                     :stroke="item.color"
-                    :style="donutStroke(item)"
+                    v-bind="donutStroke(item, i)"
                   ></circle>
                 </svg>
                 <div class="donut-legend">
@@ -915,13 +964,13 @@ onMounted(async () => {
                 <svg viewBox="0 0 80 80" class="mini-donut-svg">
                   <circle cx="40" cy="40" r="32" class="donut-track" stroke-width="10"></circle>
                   <circle
-                    v-for="item in departmentData"
+                    v-for="(item, i) in departmentData"
                     :key="item.name"
                     cx="40" cy="40" r="32"
                     class="donut-segment"
                     stroke-width="10"
                     :stroke="item.color"
-                    :style="miniDonutStroke(item)"
+                    v-bind="miniDonutStroke(item, i)"
                   ></circle>
                 </svg>
                 <div class="mini-legend">
@@ -1012,9 +1061,54 @@ onMounted(async () => {
 
       <!-- ══════════════════════ ANALİZLER ══════════════════════ -->
       <template v-else-if="activeTab === 'Analizler'">
+
+        <!-- Overview Stats -->
+        <section v-if="overviewStats.totalSessions" class="analytics-overview-card card-surface">
+          <div class="section-title-row" style="margin-bottom:20px;">
+            <div><h2>Genel Bakış</h2><span></span></div>
+          </div>
+          <div class="analytics-stats-row">
+            <div class="stat-chip">
+              <strong>{{ overviewStats.totalSessions ?? 0 }}</strong>
+              <span>Toplam Oturum</span>
+            </div>
+            <div class="stat-chip">
+              <strong>%{{ overviewStats.avgScore?.toFixed(1) ?? '—' }}</strong>
+              <span>Ortalama Başarı</span>
+            </div>
+            <div class="stat-chip">
+              <strong>%{{ overviewStats.maxScore?.toFixed(1) ?? '—' }}</strong>
+              <span>En Yüksek</span>
+            </div>
+            <div class="stat-chip">
+              <strong>%{{ overviewStats.minScore?.toFixed(1) ?? '—' }}</strong>
+              <span>En Düşük</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Top Wrong Questions -->
+        <section v-if="topWrongQuestions.length" class="section-block card-surface" style="padding:24px;border-radius:26px;">
+          <div class="section-title-row">
+            <div><h2>En Çok Yanlış Yapılan Sorular</h2><span></span></div>
+          </div>
+          <div class="wrong-questions-list">
+            <div
+              v-for="(q, i) in topWrongQuestions.slice(0, 5)"
+              :key="q._id ?? i"
+              class="wrong-question-row"
+            >
+              <span class="wq-rank">{{ i + 1 }}</span>
+              <span class="wq-text">{{ q.questionText }}</span>
+              <span class="wq-count">{{ q.wrongCount }} yanlış</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Department Charts -->
         <section class="section-block">
           <div class="section-title-row">
-            <div><h2>Analizler</h2><span></span></div>
+            <div><h2>Departman Analizleri</h2><span></span></div>
           </div>
           <div class="analytics-grid">
             <article class="chart-card donut-card">
@@ -1026,12 +1120,12 @@ onMounted(async () => {
                 <svg viewBox="0 0 120 120" class="donut-svg">
                   <circle cx="60" cy="60" r="50" class="donut-track"></circle>
                   <circle
-                    v-for="item in departmentData"
+                    v-for="(item, i) in departmentData"
                     :key="item.name"
                     cx="60" cy="60" r="50"
                     class="donut-segment"
                     :stroke="item.color"
-                    :style="donutStroke(item)"
+                    v-bind="donutStroke(item, i)"
                   ></circle>
                 </svg>
                 <div class="donut-legend">
@@ -1064,10 +1158,75 @@ onMounted(async () => {
               </div>
             </article>
           </div>
-          <div class="center-cta">
-            <button class="primary-btn" type="button">Detaylı Raporlar</button>
+        </section>
+
+        <!-- Report Generation -->
+        <section class="section-block card-surface" style="padding:28px;border-radius:26px;">
+          <div class="section-title-row" style="margin-bottom:24px;">
+            <div><h2>Rapor Oluştur</h2><span></span></div>
+          </div>
+          <div class="report-gen-form">
+            <div class="field-group">
+              <label class="field-label">Rapor Türü</label>
+              <select v-model="reportForm.reportType" class="field-select" style="max-width:360px;">
+                <option value="weekly_summary">Haftalık Özet</option>
+                <option value="monthly_summary">Aylık Özet</option>
+                <option value="risk_assessment">Risk Değerlendirmesi</option>
+              </select>
+            </div>
+            <div class="field-row-2" style="max-width:480px;">
+              <div class="field-group">
+                <label class="field-label">Dönem Başlangıcı</label>
+                <input v-model="reportForm.periodStart" class="field-input" type="date" />
+              </div>
+              <div class="field-group">
+                <label class="field-label">Dönem Bitişi</label>
+                <input v-model="reportForm.periodEnd" class="field-input" type="date" />
+              </div>
+            </div>
+            <p v-if="reportError" class="form-error" style="margin-top:4px;">{{ reportError }}</p>
+            <div class="step-actions" style="justify-content:flex-start;">
+              <button
+                class="primary-btn"
+                type="button"
+                :disabled="reportGenerating"
+                @click="submitGenerateReport"
+              >
+                {{ reportGenerating ? 'Oluşturuluyor…' : 'Rapor Oluştur' }}
+              </button>
+            </div>
           </div>
         </section>
+
+        <!-- Reports List -->
+        <section v-if="analyticsStore.reports.length" class="section-block card-surface" style="padding:28px;border-radius:26px;">
+          <div class="section-title-row" style="margin-bottom:20px;">
+            <div><h2>Oluşturulan Raporlar</h2><span></span></div>
+          </div>
+          <div class="reports-list">
+            <div
+              v-for="report in analyticsStore.reports"
+              :key="report._id"
+              class="report-list-row"
+            >
+              <span class="report-type-chip">{{ REPORT_TYPE_LABELS[report.reportType] }}</span>
+              <div class="report-list-meta">
+                <strong>
+                  {{ new Date(report.periodStart).toLocaleDateString('tr-TR') }} —
+                  {{ new Date(report.periodEnd).toLocaleDateString('tr-TR') }}
+                </strong>
+                <p>
+                  Ort. Başarı: %{{ report.avgScore?.toFixed(1) ?? '—' }}
+                  · Oluşturan: {{ report.generatedBy?.fullName ?? '—' }}
+                </p>
+              </div>
+              <span class="risk-badge" :class="`risk-${report.riskLevel}`">
+                {{ RISK_LABELS[report.riskLevel] ?? report.riskLevel }}
+              </span>
+            </div>
+          </div>
+        </section>
+
       </template>
 
     </main>
