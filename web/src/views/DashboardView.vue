@@ -58,6 +58,13 @@ const testType = ref('multiple_choice');
 const testDifficulty = ref(3);
 const step1Error = ref('');
 
+// ─── Inline category creation ──────────────────────────────────────────────
+const showAddCategoryInline = ref(false);
+const newCategoryName = ref('');
+const newCategoryDesc = ref('');
+const addCategoryLoading = ref(false);
+const addCategoryError = ref('');
+
 // ─── Wizard step 2 ─────────────────────────────────────────────────────────
 const selectedQuestionIds = ref([]);
 const showAddQuestionForm = ref(false);
@@ -337,6 +344,29 @@ function toggleQuestion(id) {
 
 function isQuestionSelected(id) {
   return selectedQuestionIds.value.includes(id);
+}
+
+async function submitAddCategory() {
+  addCategoryError.value = '';
+  if (!newCategoryName.value.trim()) {
+    addCategoryError.value = 'Kategori adı boş bırakılamaz.';
+    return;
+  }
+  addCategoryLoading.value = true;
+  try {
+    const cat = await categoryStore.createCategory({
+      name: newCategoryName.value.trim(),
+      ...(newCategoryDesc.value.trim() && { description: newCategoryDesc.value.trim() }),
+    });
+    testCategoryId.value = cat._id;
+    newCategoryName.value = '';
+    newCategoryDesc.value = '';
+    showAddCategoryInline.value = false;
+  } catch (err) {
+    addCategoryError.value = err.response?.data?.message ?? 'Kategori oluşturulamadı.';
+  } finally {
+    addCategoryLoading.value = false;
+  }
 }
 
 async function submitAddQuestion() {
@@ -690,13 +720,61 @@ onMounted(async () => {
                 />
               </div>
               <div class="field-group">
-                <label class="field-label">Kategori</label>
-                <select v-model="testCategoryId" class="field-select">
+                <div class="category-field-header">
+                  <label class="field-label">Kategori</label>
+                  <button
+                    class="add-category-toggle"
+                    type="button"
+                    @click="showAddCategoryInline = !showAddCategoryInline; addCategoryError = ''"
+                  >
+                    {{ showAddCategoryInline ? '✕ İptal' : '+ Yeni Kategori' }}
+                  </button>
+                </div>
+
+                <select
+                  v-if="!showAddCategoryInline"
+                  v-model="testCategoryId"
+                  class="field-select"
+                >
                   <option value="">Kategori seçin…</option>
                   <option v-for="cat in categoryStore.categories" :key="cat._id" :value="cat._id">
                     {{ cat.name }}
                   </option>
                 </select>
+
+                <div v-else class="add-category-inline">
+                  <input
+                    v-model="newCategoryName"
+                    class="field-input"
+                    type="text"
+                    placeholder="Kategori adı (örn. Vue.js, Satış Becerileri…)"
+                    maxlength="100"
+                    @keyup.enter="submitAddCategory"
+                  />
+                  <input
+                    v-model="newCategoryDesc"
+                    class="field-input"
+                    type="text"
+                    placeholder="Açıklama (opsiyonel)"
+                    maxlength="500"
+                  />
+                  <p v-if="addCategoryError" class="form-error">{{ addCategoryError }}</p>
+                  <div class="add-category-actions">
+                    <button
+                      class="secondary-btn"
+                      type="button"
+                      @click="showAddCategoryInline = false; newCategoryName = ''; newCategoryDesc = ''; addCategoryError = ''"
+                    >İptal</button>
+                    <button
+                      class="primary-btn"
+                      type="button"
+                      :disabled="addCategoryLoading"
+                      @click="submitAddCategory"
+                    >
+                      {{ addCategoryLoading ? 'Kaydediliyor…' : 'Kategori Kaydet' }}
+                    </button>
+                  </div>
+                </div>
               </div>
               <div class="field-row-2">
                 <div class="field-group">
@@ -732,7 +810,21 @@ onMounted(async () => {
               <!-- Questions column -->
               <div class="test-create-questions">
                 <div
-                  v-if="!filteredQuestions.length && !showAddQuestionForm"
+                  v-if="!testCategoryId"
+                  class="no-category-notice card-surface"
+                >
+                  <span class="no-category-icon">⚠️</span>
+                  <div>
+                    <strong>Kategori seçilmedi</strong>
+                    <p>Soru ekleyebilmek için önce bir kategori seçmeniz gerekiyor.</p>
+                  </div>
+                  <button class="secondary-btn" type="button" @click="prevStep">
+                    Adım 1'e Dön
+                  </button>
+                </div>
+
+                <div
+                  v-else-if="!filteredQuestions.length && !showAddQuestionForm"
                   class="empty-state card-surface"
                   style="border-radius:20px;padding:40px;"
                 >

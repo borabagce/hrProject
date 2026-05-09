@@ -1744,6 +1744,76 @@ a {
   line-height: 1;
 }
 
+/* ── INLINE CATEGORY CREATION ── */
+.category-field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 0;
+}
+
+.add-category-toggle {
+  border: 1px solid rgba(46, 125, 122, 0.28);
+  border-radius: 999px;
+  padding: 4px 12px;
+  background: transparent;
+  color: var(--teal);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.add-category-toggle:hover {
+  background: rgba(46, 125, 122, 0.07);
+}
+
+.add-category-inline {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 14px;
+  background: rgba(46, 125, 122, 0.04);
+  border: 1px dashed rgba(46, 125, 122, 0.22);
+  margin-top: 4px;
+}
+
+.add-category-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+/* ── NO CATEGORY NOTICE (Step 2) ── */
+.no-category-notice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  border-radius: 16px;
+  margin-bottom: 4px;
+}
+
+.no-category-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.no-category-notice strong {
+  display: block;
+  font-size: 0.92rem;
+  color: var(--ink);
+}
+
+.no-category-notice p {
+  margin: 3px 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
 /* ── ANALIZLER TAB ── */
 .analytics-overview-card {
   padding: 24px;
