@@ -13,6 +13,8 @@ import questionRoutes from './routes/question.routes.js';
 import testSessionRoutes from './routes/testSession.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
 import knowledgeProfileRoutes from './routes/knowledgeProfile.routes.js';
+import testRoutes from './routes/test.routes.js';
+import assignmentRoutes from './routes/assignment.routes.js';
 
 const app = express();
 
@@ -37,6 +39,8 @@ app.use('/api/questions', questionRoutes);
 app.use('/api/sessions', testSessionRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/knowledge', knowledgeProfileRoutes);
+app.use('/api/tests', testRoutes);
+app.use('/api/assignments', assignmentRoutes);
 
 app.use((_req, res) => res.status(404).json({ success: false, message: 'Route not found' }));
 app.use(errorHandler);
