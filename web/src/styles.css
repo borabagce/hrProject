@@ -1833,6 +1833,23 @@ a {
   font-size: 0.82rem;
 }
 
+.assign-feedback {
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  margin: 0 0 12px;
+}
+
+.assign-feedback-success {
+  background: rgba(76, 175, 80, 0.1);
+  color: #388e3c;
+}
+
+.assign-feedback-error {
+  background: rgba(233, 30, 140, 0.08);
+  color: var(--pink);
+}
+
 .assign-empty {
   text-align: center;
   color: var(--muted);

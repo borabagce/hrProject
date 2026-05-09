@@ -7,6 +7,7 @@ import { useAnalyticsStore } from '@/stores/analytics';
 import { useQuestionStore } from '@/stores/question';
 import { useCategoryStore } from '@/stores/category';
 import { useDepartmentStore } from '@/stores/department';
+import { useTestStore } from '@/stores/tests';
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -15,6 +16,7 @@ const analyticsStore = useAnalyticsStore();
 const questionStore = useQuestionStore();
 const categoryStore = useCategoryStore();
 const departmentStore = useDepartmentStore();
+const testStore = useTestStore();
 
 const DEPT_COLORS = ['#2E7D7A', '#5FB7C1', '#95D5D0', '#B2E0DD', '#E8F4F8', '#3DBDB0', '#1A5F5C'];
 const ACCENT_CYCLE = ['teal', 'blue', 'coral'];
@@ -92,12 +94,12 @@ const step3Error = ref('');
 const publishSuccess = ref(false);
 const publishedTestName = ref('');
 
-// ─── Saved tests (localStorage — no backend assignment API) ───────────────
-const savedTests = ref(JSON.parse(localStorage.getItem('ik-saved-tests') || '[]'));
-
 // ─── Assign test modal ─────────────────────────────────────────────────────
 const showAssignTestModal = ref(false);
 const assignTarget = ref(null);
+const assignLoading = ref(false);
+const assignError = ref('');
+const assignSuccess = ref('');
 
 // ─── Employee add modal ────────────────────────────────────────────────────
 const showAddEmployeeModal = ref(false);
@@ -271,7 +273,9 @@ function resetWizard() {
   wizardStep.value = 1;
 }
 
-function publishTest() {
+const publishLoading = ref(false);
+
+async function publishTest() {
   if (!selectedQuestionIds.value.length) {
     step3Error.value = 'En az bir soru seçmelisiniz.';
     return;
@@ -281,45 +285,46 @@ function publishTest() {
     return;
   }
   step3Error.value = '';
-  publishedTestName.value = testTitle.value;
-
-  const entry = {
-    id: Date.now().toString(),
-    title: testTitle.value,
-    categoryId: testCategoryId.value,
-    categoryName: selectedCategoryName.value,
-    type: testType.value,
-    difficulty: testDifficulty.value,
-    questionIds: [...selectedQuestionIds.value],
-    questionCount: selectedQuestionIds.value.length,
-    createdAt: new Date().toISOString(),
-  };
-  savedTests.value.unshift(entry);
-  localStorage.setItem('ik-saved-tests', JSON.stringify(savedTests.value.slice(0, 30)));
-
-  publishSuccess.value = true;
+  publishLoading.value = true;
+  try {
+    const test = await testStore.createTest({
+      title: testTitle.value,
+      ...(testCategoryId.value && { categoryId: testCategoryId.value }),
+      type: testType.value,
+      difficulty: testDifficulty.value,
+      questionIds: selectedQuestionIds.value,
+    });
+    await testStore.assignTest(test._id, selectedEmployeeIds.value);
+    publishedTestName.value = testTitle.value;
+    publishSuccess.value = true;
+  } catch (err) {
+    step3Error.value = err.response?.data?.message ?? 'Test oluşturulamadı, tekrar deneyin.';
+  } finally {
+    publishLoading.value = false;
+  }
 }
 
-function openAssignTestModal(emp) {
+async function openAssignTestModal(emp) {
   assignTarget.value = emp;
+  assignError.value = '';
+  assignSuccess.value = '';
   showAssignTestModal.value = true;
+  if (!testStore.tests.length) {
+    await testStore.fetchTests({ isActive: true }).catch(() => {});
+  }
 }
 
-function assignExistingTest(test) {
-  testTitle.value = test.title;
-  testCategoryId.value = test.categoryId || '';
-  testType.value = test.type || 'multiple_choice';
-  testDifficulty.value = test.difficulty || 3;
-  selectedQuestionIds.value = [...(test.questionIds || [])];
-  selectedEmployeeIds.value = [assignTarget.value.id];
-  wizardStep.value = 3;
-  publishSuccess.value = false;
-  showAssignTestModal.value = false;
-  activeTab.value = 'Test Oluşturma';
-  if (questionStore.questions.length === 0) {
-    questionLoading.value = true;
-    Promise.all([questionStore.fetchQuestions(), categoryStore.fetchCategories()])
-      .finally(() => { questionLoading.value = false; });
+async function assignExistingTest(test) {
+  assignError.value = '';
+  assignSuccess.value = '';
+  assignLoading.value = true;
+  try {
+    await testStore.assignTest(test._id, [assignTarget.value.id]);
+    assignSuccess.value = `"${test.title}" testi ${assignTarget.value.name} personeline atandı.`;
+  } catch (err) {
+    assignError.value = err.response?.data?.message ?? 'Atama başarısız, tekrar deneyin.';
+  } finally {
+    assignLoading.value = false;
   }
 }
 
@@ -1085,7 +1090,9 @@ onMounted(async () => {
             </div>
             <div class="step-actions">
               <button class="secondary-btn" type="button" @click="prevStep">Önceki Adım</button>
-              <button class="primary-btn" type="button" @click="publishTest">Testi Yayınla 🚀</button>
+              <button class="primary-btn" type="button" :disabled="publishLoading" @click="publishTest">
+                {{ publishLoading ? 'Yayınlanıyor…' : 'Testi Yayınla 🚀' }}
+              </button>
             </div>
           </section>
         </template>
@@ -1397,33 +1404,43 @@ onMounted(async () => {
           </div>
         </div>
 
+        <!-- Success / error feedback -->
+        <p v-if="assignSuccess" class="assign-feedback assign-feedback-success">✓ {{ assignSuccess }}</p>
+        <p v-if="assignError" class="assign-feedback assign-feedback-error">{{ assignError }}</p>
+
         <!-- Create fresh button -->
         <button class="assign-new-btn primary-btn" type="button" @click="startFreshTestForEmployee">
           + Yeni Test Oluştur (Sıfırdan)
         </button>
 
-        <!-- Saved tests list -->
-        <template v-if="savedTests.length">
+        <!-- Existing tests from API -->
+        <template v-if="testStore.loading">
+          <div style="text-align:center;padding:16px 0;">
+            <div class="spinner" style="width:28px;height:28px;margin:0 auto;"></div>
+          </div>
+        </template>
+        <template v-else-if="testStore.tests.length">
           <div class="assign-divider">
-            <span>veya kayıtlı testlerden seç</span>
+            <span>veya mevcut testlerden seç</span>
           </div>
           <div class="assign-tests-list">
             <div
-              v-for="test in savedTests"
-              :key="test.id"
+              v-for="test in testStore.tests"
+              :key="test._id"
               class="assign-test-row"
             >
               <div class="assign-test-info">
                 <strong>{{ test.title }}</strong>
                 <p>
-                  {{ test.categoryName || 'Tüm Kategoriler' }}
-                  · {{ test.questionCount }} soru
-                  · Zorluk {{ test.difficulty }}/5
+                  {{ test.categoryId?.name || 'Tüm Kategoriler' }}
+                  · {{ test.questionIds?.length ?? 0 }} soru
+                  · Zorluk {{ test.difficulty ?? '—' }}/5
                 </p>
               </div>
               <button
                 class="primary-btn assign-test-btn"
                 type="button"
+                :disabled="assignLoading"
                 @click="assignExistingTest(test)"
               >
                 Ata →
@@ -1431,9 +1448,8 @@ onMounted(async () => {
             </div>
           </div>
         </template>
-
         <p v-else class="assign-empty">
-          Henüz kayıtlı test yok. Bir test oluşturup yayınladığınızda burada görünür.
+          Henüz oluşturulmuş test yok. Wizard'dan bir test oluşturup yayınladığınızda burada görünür.
         </p>
       </div>
     </div>
