@@ -21,10 +21,21 @@ const router = createRouter({
   routes,
 });
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore();
+
   if (to.meta.requiresAuth && !auth.isAuthenticated) return { name: 'Login' };
   if (to.meta.guest && auth.isAuthenticated) return { name: 'Dashboard' };
+
+  if (to.meta.requiresAuth && auth.isAuthenticated) {
+    if (!auth.user) {
+      try { await auth.fetchMe(); } catch { auth.logout(); return { name: 'Login' }; }
+    }
+    if (auth.user?.role === 'employee') {
+      auth.logout();
+      return { name: 'Login' };
+    }
+  }
 });
 
 export default router;

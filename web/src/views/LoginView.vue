@@ -18,7 +18,7 @@ async function submit() {
     await auth.login(email.value, password.value);
     router.push('/');
   } catch (err) {
-    error.value = err.response?.data?.message ?? 'Giriş başarısız, bilgilerinizi kontrol edin.';
+    error.value = err.response?.data?.message ?? err.message ?? 'Giriş başarısız, bilgilerinizi kontrol edin.';
   } finally {
     loading.value = false;
   }

@@ -46,6 +46,8 @@ export const login = async (req, res, next) => {
     const match = await user.comparePassword(password);
     if (!match) throw ApiError.unauthorized('Invalid credentials');
 
+    if (user.role === 'employee') throw ApiError.forbidden('Bu panele erişim yetkiniz yok.');
+
     const [accessToken, refreshToken] = await Promise.all([
       signAccessToken(tokenPayload(user)),
       signRefreshToken(tokenPayload(user)),

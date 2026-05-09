@@ -24,6 +24,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function login(email, password) {
     const { data } = await api.post('/api/auth/login', { email, password });
     const { user: u, accessToken: at, refreshToken: rt } = data.data;
+    if (u.role === 'employee') throw new Error('Bu panele erişim yetkiniz yok.');
     user.value = u;
     accessToken.value = at;
     refreshToken.value = rt;
