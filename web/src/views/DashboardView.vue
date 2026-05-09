@@ -92,6 +92,13 @@ const step3Error = ref('');
 const publishSuccess = ref(false);
 const publishedTestName = ref('');
 
+// ─── Saved tests (localStorage — no backend assignment API) ───────────────
+const savedTests = ref(JSON.parse(localStorage.getItem('ik-saved-tests') || '[]'));
+
+// ─── Assign test modal ─────────────────────────────────────────────────────
+const showAssignTestModal = ref(false);
+const assignTarget = ref(null);
+
 // ─── Employee add modal ────────────────────────────────────────────────────
 const showAddEmployeeModal = ref(false);
 const addEmployeeLoading = ref(false);
@@ -275,7 +282,57 @@ function publishTest() {
   }
   step3Error.value = '';
   publishedTestName.value = testTitle.value;
+
+  const entry = {
+    id: Date.now().toString(),
+    title: testTitle.value,
+    categoryId: testCategoryId.value,
+    categoryName: selectedCategoryName.value,
+    type: testType.value,
+    difficulty: testDifficulty.value,
+    questionIds: [...selectedQuestionIds.value],
+    questionCount: selectedQuestionIds.value.length,
+    createdAt: new Date().toISOString(),
+  };
+  savedTests.value.unshift(entry);
+  localStorage.setItem('ik-saved-tests', JSON.stringify(savedTests.value.slice(0, 30)));
+
   publishSuccess.value = true;
+}
+
+function openAssignTestModal(emp) {
+  assignTarget.value = emp;
+  showAssignTestModal.value = true;
+}
+
+function assignExistingTest(test) {
+  testTitle.value = test.title;
+  testCategoryId.value = test.categoryId || '';
+  testType.value = test.type || 'multiple_choice';
+  testDifficulty.value = test.difficulty || 3;
+  selectedQuestionIds.value = [...(test.questionIds || [])];
+  selectedEmployeeIds.value = [assignTarget.value.id];
+  wizardStep.value = 3;
+  publishSuccess.value = false;
+  showAssignTestModal.value = false;
+  activeTab.value = 'Test Oluşturma';
+  if (questionStore.questions.length === 0) {
+    questionLoading.value = true;
+    Promise.all([questionStore.fetchQuestions(), categoryStore.fetchCategories()])
+      .finally(() => { questionLoading.value = false; });
+  }
+}
+
+function startFreshTestForEmployee() {
+  resetWizard();
+  selectedEmployeeIds.value = [assignTarget.value.id];
+  showAssignTestModal.value = false;
+  activeTab.value = 'Test Oluşturma';
+  if (questionStore.questions.length === 0) {
+    questionLoading.value = true;
+    Promise.all([questionStore.fetchQuestions(), categoryStore.fetchCategories()])
+      .finally(() => { questionLoading.value = false; });
+  }
 }
 
 async function submitGenerateReport() {
@@ -608,7 +665,7 @@ onMounted(async () => {
                 </div>
               </div>
               <div class="employee-actions">
-                <button type="button" @click="activeTab = 'Test Oluşturma'">Test ata</button>
+                <button type="button" @click="openAssignTestModal(emp)">Test ata</button>
                 <button type="button" @click="activeTab = 'Analizler'">Raporu gör</button>
                 <button type="button" @click="activeTab = 'Personeller'">Takip</button>
               </div>
@@ -1143,7 +1200,7 @@ onMounted(async () => {
                 </div>
               </div>
               <div class="employee-actions">
-                <button type="button" @click="activeTab = 'Test Oluşturma'">Test ata</button>
+                <button type="button" @click="openAssignTestModal(emp)">Test ata</button>
                 <button type="button" @click="activeTab = 'Analizler'">Raporu gör</button>
               </div>
             </article>
@@ -1322,6 +1379,64 @@ onMounted(async () => {
       </template>
 
     </main>
+
+    <!-- ══════════════════════ ASSIGN TEST MODAL ══════════════════════ -->
+    <div v-if="showAssignTestModal" class="modal-overlay" @click.self="showAssignTestModal = false">
+      <div class="modal-card card-surface">
+        <div class="modal-header">
+          <h2>Test Atama</h2>
+          <button class="modal-close" type="button" @click="showAssignTestModal = false">✕</button>
+        </div>
+
+        <!-- Employee chip -->
+        <div v-if="assignTarget" class="assign-target-chip">
+          <div class="employee-avatar small">{{ assignTarget.initial }}</div>
+          <div>
+            <strong>{{ assignTarget.name }}</strong>
+            <p>{{ assignTarget.dept }}</p>
+          </div>
+        </div>
+
+        <!-- Create fresh button -->
+        <button class="assign-new-btn primary-btn" type="button" @click="startFreshTestForEmployee">
+          + Yeni Test Oluştur (Sıfırdan)
+        </button>
+
+        <!-- Saved tests list -->
+        <template v-if="savedTests.length">
+          <div class="assign-divider">
+            <span>veya kayıtlı testlerden seç</span>
+          </div>
+          <div class="assign-tests-list">
+            <div
+              v-for="test in savedTests"
+              :key="test.id"
+              class="assign-test-row"
+            >
+              <div class="assign-test-info">
+                <strong>{{ test.title }}</strong>
+                <p>
+                  {{ test.categoryName || 'Tüm Kategoriler' }}
+                  · {{ test.questionCount }} soru
+                  · Zorluk {{ test.difficulty }}/5
+                </p>
+              </div>
+              <button
+                class="primary-btn assign-test-btn"
+                type="button"
+                @click="assignExistingTest(test)"
+              >
+                Ata →
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <p v-else class="assign-empty">
+          Henüz kayıtlı test yok. Bir test oluşturup yayınladığınızda burada görünür.
+        </p>
+      </div>
+    </div>
 
     <!-- ══════════════════════ EMPLOYEE ADD MODAL ══════════════════════ -->
     <div v-if="showAddEmployeeModal" class="modal-overlay" @click.self="showAddEmployeeModal = false">
