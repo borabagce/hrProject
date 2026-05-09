@@ -51,6 +51,8 @@ const questionLoading = ref(false);
 // ─── Personeller ───────────────────────────────────────────────────────────
 const search = ref('');
 const deptFilter = ref('Tümü');
+const statusFilter = ref('Tümü');
+const togglingIds = ref([]);
 
 // ─── Wizard step 1 ─────────────────────────────────────────────────────────
 const wizardStep = ref(1);
@@ -143,6 +145,8 @@ const filteredEmployees = computed(() => {
   if (deptFilter.value !== 'Tümü') {
     result = result.filter((e) => e.dept === deptFilter.value);
   }
+  if (statusFilter.value === 'Aktif') result = result.filter((e) => e.isActive);
+  else if (statusFilter.value === 'Pasif') result = result.filter((e) => !e.isActive);
   return result;
 });
 
@@ -470,6 +474,18 @@ function openAddEmployeeModal() {
   newEmployee.value = defaultEmployee();
   addEmployeeError.value = '';
   showAddEmployeeModal.value = true;
+}
+
+async function toggleUserActive(emp) {
+  if (togglingIds.value.includes(emp.id)) return;
+  togglingIds.value.push(emp.id);
+  try {
+    await userStore.updateUser(emp.id, { isActive: !emp.isActive });
+  } catch {
+    /* hata sessizce geçilir, UI değişmez */
+  } finally {
+    togglingIds.value = togglingIds.value.filter((id) => id !== emp.id);
+  }
 }
 
 async function submitAddEmployee() {
@@ -1164,10 +1180,10 @@ onMounted(async () => {
             <div class="filter-dropdowns">
               <div>
                 <label class="filter-label">Kayıt Durumu</label>
-                <select class="field-select">
-                  <option>Aktif</option>
-                  <option>Pasif</option>
-                  <option>Tümü</option>
+                <select v-model="statusFilter" class="field-select">
+                  <option value="Tümü">Tümü</option>
+                  <option value="Aktif">Aktif</option>
+                  <option value="Pasif">Pasif</option>
                 </select>
               </div>
               <div>
@@ -1197,18 +1213,35 @@ onMounted(async () => {
               v-for="emp in filteredEmployees"
               :key="emp.id"
               class="employee-card"
-              :class="emp.accent"
+              :class="[emp.accent, { 'emp-inactive': !emp.isActive }]"
             >
               <div class="employee-head">
                 <div class="employee-avatar">{{ emp.initial }}</div>
-                <div>
-                  <h3>{{ emp.name }}</h3>
+                <div class="employee-head-info">
+                  <div class="employee-name-row">
+                    <h3>{{ emp.name }}</h3>
+                    <span
+                      class="emp-status-badge"
+                      :class="emp.isActive ? 'status-active' : 'status-inactive'"
+                    >{{ emp.isActive ? 'Aktif' : 'Pasif' }}</span>
+                  </div>
                   <p>{{ emp.dept }}</p>
                 </div>
               </div>
               <div class="employee-actions">
-                <button type="button" @click="openAssignTestModal(emp)">Test ata</button>
+                <button type="button" :disabled="!emp.isActive" @click="openAssignTestModal(emp)">
+                  Test ata
+                </button>
                 <button type="button" @click="activeTab = 'Analizler'">Raporu gör</button>
+                <button
+                  type="button"
+                  class="emp-toggle-btn"
+                  :class="emp.isActive ? 'emp-deactivate' : 'emp-activate'"
+                  :disabled="togglingIds.includes(emp.id)"
+                  @click="toggleUserActive(emp)"
+                >
+                  {{ togglingIds.includes(emp.id) ? '…' : (emp.isActive ? 'Deaktif Et' : 'Aktif Et') }}
+                </button>
               </div>
             </article>
           </div>

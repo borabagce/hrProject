@@ -648,6 +648,77 @@ a {
   font-size: 0.82rem;
 }
 
+.employee-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.employee-head-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.employee-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.employee-name-row h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.emp-status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.status-active {
+  background: rgba(76, 175, 80, 0.18);
+  color: #2e7d32;
+}
+
+.status-inactive {
+  background: rgba(180, 0, 0, 0.1);
+  color: #b71c1c;
+}
+
+.emp-inactive {
+  opacity: 0.6;
+  filter: grayscale(0.5);
+}
+
+.emp-toggle-btn {
+  background: transparent !important;
+  border: 1.5px solid currentColor !important;
+  font-weight: 700 !important;
+}
+
+.emp-deactivate {
+  color: #c62828 !important;
+  border-color: rgba(198, 40, 40, 0.55) !important;
+}
+
+.emp-deactivate:hover:not(:disabled) {
+  background: rgba(198, 40, 40, 0.08) !important;
+}
+
+.emp-activate {
+  color: #2e7d32 !important;
+  border-color: rgba(46, 125, 50, 0.55) !important;
+}
+
+.emp-activate:hover:not(:disabled) {
+  background: rgba(46, 125, 50, 0.08) !important;
+}
+
 .analytics-grid .chart-card {
   padding: 16px;
   min-height: 250px;
