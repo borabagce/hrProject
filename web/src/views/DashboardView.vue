@@ -100,6 +100,24 @@ const publishedTestName = ref('');
 // ─── Test sub-view ─────────────────────────────────────────────────────────
 const testSubView = ref('wizard');
 
+// ─── Test expand / assignments ─────────────────────────────────────────────
+const expandedTestId = ref(null);
+const testAssignmentsMap = ref({});
+const assignmentsLoadingId = ref(null);
+
+const ASSIGNMENT_STATUS_LABELS = {
+  pending: 'Bekliyor',
+  in_progress: 'Devam Ediyor',
+  completed: 'Tamamlandı',
+  expired: 'Süresi Doldu',
+};
+const ASSIGNMENT_STATUS_CLASSES = {
+  pending: 'asgn-pending',
+  in_progress: 'asgn-inprogress',
+  completed: 'asgn-completed',
+  expired: 'asgn-expired',
+};
+
 // ─── Existing question picker ──────────────────────────────────────────────
 const showExistingPicker = ref(false);
 const pickerStep = ref('tests');
@@ -541,6 +559,24 @@ async function submitAddEmployee() {
 
 // ─── Saved tests ───────────────────────────────────────────────────────────
 
+async function toggleTestExpand(test) {
+  if (expandedTestId.value === test._id) {
+    expandedTestId.value = null;
+    return;
+  }
+  expandedTestId.value = test._id;
+  if (testAssignmentsMap.value[test._id]) return;
+  assignmentsLoadingId.value = test._id;
+  try {
+    const assignments = await testStore.fetchTestAssignments(test._id);
+    testAssignmentsMap.value = { ...testAssignmentsMap.value, [test._id]: assignments };
+  } catch {
+    testAssignmentsMap.value = { ...testAssignmentsMap.value, [test._id]: [] };
+  } finally {
+    assignmentsLoadingId.value = null;
+  }
+}
+
 function openSavedTestAssign(test) {
   savedTestAssignTarget.value = test;
   savedTestAssignEmployeeIds.value = [];
@@ -891,30 +927,72 @@ onMounted(async () => {
               <p>Henüz oluşturulmuş test yok.</p>
             </div>
             <div v-else class="saved-tests-list">
-              <div v-for="test in testStore.tests" :key="test._id" class="saved-test-row">
-                <div class="saved-test-info">
-                  <div class="saved-test-title-row">
-                    <strong>{{ test.title }}</strong>
-                    <span
-                      class="emp-status-badge"
-                      :class="test.isActive ? 'status-active' : 'status-inactive'"
-                    >{{ test.isActive ? 'Aktif' : 'Pasif' }}</span>
+              <div
+                v-for="test in testStore.tests"
+                :key="test._id"
+                class="saved-test-card"
+                :class="{ 'saved-test-expanded': expandedTestId === test._id }"
+              >
+                <!-- Row header (clickable) -->
+                <div class="saved-test-row" @click="toggleTestExpand(test)">
+                  <div class="saved-test-info">
+                    <div class="saved-test-title-row">
+                      <strong>{{ test.title }}</strong>
+                      <span
+                        class="emp-status-badge"
+                        :class="test.isActive ? 'status-active' : 'status-inactive'"
+                      >{{ test.isActive ? 'Aktif' : 'Pasif' }}</span>
+                    </div>
+                    <p>
+                      {{ test.categoryId?.name ?? 'Genel' }}
+                      · {{ TYPE_LABELS[test.type] ?? test.type }}
+                      · {{ test.questionIds?.length ?? 0 }} soru
+                      · Zorluk {{ test.difficulty }}/5
+                      <template v-if="test.createdBy?.fullName"> · {{ test.createdBy.fullName }}</template>
+                    </p>
                   </div>
-                  <p>
-                    {{ test.categoryId?.name ?? 'Genel' }}
-                    · {{ TYPE_LABELS[test.type] ?? test.type }}
-                    · {{ test.questionIds?.length ?? 0 }} soru
-                    · Zorluk {{ test.difficulty }}/5
-                    · {{ test.createdBy?.fullName ?? '' }}
-                  </p>
+                  <div class="saved-test-row-actions" @click.stop>
+                    <button
+                      class="primary-btn"
+                      type="button"
+                      style="padding:8px 16px;font-size:0.82rem;"
+                      :disabled="!test.isActive"
+                      @click="openSavedTestAssign(test)"
+                    >Ata →</button>
+                    <span class="expand-chevron" :class="{ rotated: expandedTestId === test._id }">▾</span>
+                  </div>
                 </div>
-                <button
-                  class="primary-btn"
-                  type="button"
-                  style="padding:9px 18px;font-size:0.82rem;flex-shrink:0;"
-                  :disabled="!test.isActive"
-                  @click="openSavedTestAssign(test)"
-                >Ata →</button>
+
+                <!-- Assignments panel -->
+                <div v-if="expandedTestId === test._id" class="test-assignments-panel">
+                  <div v-if="assignmentsLoadingId === test._id" class="assignments-loading">
+                    <div class="spinner" style="width:24px;height:24px;border-width:3px;"></div>
+                  </div>
+                  <template v-else-if="testAssignmentsMap[test._id]">
+                    <p v-if="!testAssignmentsMap[test._id].length" class="assignments-empty">
+                      Bu teste henüz personel atanmamış.
+                    </p>
+                    <div v-else class="assignments-list">
+                      <div
+                        v-for="a in testAssignmentsMap[test._id]"
+                        :key="a._id"
+                        class="assignment-row"
+                      >
+                        <div class="assignee-avatar-sm">
+                          {{ a.assignedTo?.fullName?.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase() ?? '?' }}
+                        </div>
+                        <div class="assignment-info">
+                          <strong>{{ a.assignedTo?.fullName ?? '—' }}</strong>
+                          <p>{{ a.assignedTo?.email ?? '' }}</p>
+                        </div>
+                        <span
+                          class="asgn-status-badge"
+                          :class="ASSIGNMENT_STATUS_CLASSES[a.status]"
+                        >{{ ASSIGNMENT_STATUS_LABELS[a.status] ?? a.status }}</span>
+                      </div>
+                    </div>
+                  </template>
+                </div>
               </div>
             </div>
           </section>
