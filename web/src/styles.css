@@ -2204,3 +2204,188 @@ a {
     width: 100%;
   }
 }
+
+/* ── TEST SUBVIEW TABS ── */
+.test-subview-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  width: fit-content;
+  box-shadow: 0 4px 14px rgba(25, 72, 84, 0.1);
+}
+
+.subview-tab {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 22px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: all 0.18s;
+}
+
+.subview-tab.active {
+  background: var(--teal);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(46, 125, 122, 0.3);
+}
+
+.subview-tab:hover:not(.active) {
+  background: rgba(46, 125, 122, 0.08);
+  color: var(--teal);
+}
+
+/* ── SAVED TESTS LIST ── */
+.saved-tests-list {
+  display: grid;
+  gap: 10px;
+}
+
+.saved-test-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(46, 125, 122, 0.1);
+}
+
+.saved-test-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.saved-test-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.saved-test-title-row strong {
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-test-info p {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* ── STEP 2 REDESIGN ── */
+.step2-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.selected-questions-section {
+  margin-bottom: 8px;
+}
+
+.selected-q-label {
+  margin: 0 0 14px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--teal);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ── EXISTING QUESTION PICKER ── */
+.picker-questions-list {
+  display: grid;
+  gap: 8px;
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.picker-question-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(46, 125, 122, 0.1);
+}
+
+.picker-question-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.picker-question-info strong {
+  display: block;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--ink);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.picker-question-info p {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+/* ── EMPLOYEE CARD ENHANCEMENTS ── */
+.emp-role-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(46, 125, 122, 0.1);
+  color: var(--teal);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.emp-dept {
+  margin: 3px 0 2px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.emp-email {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── SECTION COUNT BADGE ── */
+.section-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(46, 125, 122, 0.12);
+  color: var(--teal);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.section-count-inactive {
+  background: rgba(180, 0, 0, 0.08);
+  color: #b71c1c;
+}

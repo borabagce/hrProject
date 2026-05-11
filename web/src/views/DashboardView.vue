@@ -21,6 +21,7 @@ const testStore = useTestStore();
 const DEPT_COLORS = ['#2E7D7A', '#5FB7C1', '#95D5D0', '#B2E0DD', '#E8F4F8', '#3DBDB0', '#1A5F5C'];
 const ACCENT_CYCLE = ['teal', 'blue', 'coral'];
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F'];
+const ROLE_LABELS = { admin: 'Yönetici', hr: 'İK Direktörü', employee: 'Personel' };
 
 const tabs = [
   { id: 'Anasayfa', icon: '🏠' },
@@ -96,6 +97,25 @@ const step3Error = ref('');
 const publishSuccess = ref(false);
 const publishedTestName = ref('');
 
+// ─── Test sub-view ─────────────────────────────────────────────────────────
+const testSubView = ref('wizard');
+
+// ─── Existing question picker ──────────────────────────────────────────────
+const showExistingPicker = ref(false);
+const pickerStep = ref('tests');
+const pickerSelectedTest = ref(null);
+const pickerTestQuestions = ref([]);
+const pickerLoading = ref(false);
+const pickerAddedQuestions = ref([]);
+
+// ─── Saved test assign modal ───────────────────────────────────────────────
+const showSavedTestAssignModal = ref(false);
+const savedTestAssignTarget = ref(null);
+const savedTestAssignEmployeeIds = ref([]);
+const savedTestAssignLoading = ref(false);
+const savedTestAssignError = ref('');
+const savedTestAssignSuccess = ref('');
+
 // ─── Assign test modal ─────────────────────────────────────────────────────
 const showAssignTestModal = ref(false);
 const assignTarget = ref(null);
@@ -119,8 +139,10 @@ const employees = computed(() =>
   userStore.users.map((u, i) => ({
     id: u._id,
     name: u.fullName,
+    email: u.email,
     dept: u.departmentId?.name ?? '—',
     role: u.role,
+    roleLabel: ROLE_LABELS[u.role] ?? u.role,
     accent: ACCENT_CYCLE[i % ACCENT_CYCLE.length],
     initial: u.fullName
       .split(' ')
@@ -201,12 +223,20 @@ const selectedCategoryName = computed(() => {
   return categoryStore.categories.find((c) => c._id === testCategoryId.value)?.name ?? '—';
 });
 
-const filteredQuestions = computed(() => {
-  if (!testCategoryId.value) return questionStore.questions;
-  return questionStore.questions.filter(
-    (q) => (q.categoryId?._id ?? q.categoryId) === testCategoryId.value
-  );
-});
+const activeEmployees = computed(() => filteredEmployees.value.filter((e) => e.isActive));
+const inactiveEmployees = computed(() => filteredEmployees.value.filter((e) => !e.isActive));
+
+const recentTests = computed(() => testStore.tests.slice(0, 2));
+
+const selectedQuestionsDetails = computed(() =>
+  selectedQuestionIds.value
+    .map(
+      (id) =>
+        questionStore.questions.find((q) => q._id === id) ??
+        pickerAddedQuestions.value.find((q) => q._id === id)
+    )
+    .filter(Boolean)
+);
 
 const TYPE_LABELS = { multiple_choice: 'Çoktan Seçmeli', true_false: 'Doğru / Yanlış' };
 
@@ -271,6 +301,7 @@ function resetWizard() {
   step3Error.value = '';
   selectedEmployeeIds.value = [];
   selectedQuestionIds.value = [];
+  pickerAddedQuestions.value = [];
   showAddQuestionForm.value = false;
   newQuestion.value = defaultQuestion();
   publishSuccess.value = false;
@@ -508,6 +539,69 @@ async function submitAddEmployee() {
   }
 }
 
+// ─── Saved tests ───────────────────────────────────────────────────────────
+
+function openSavedTestAssign(test) {
+  savedTestAssignTarget.value = test;
+  savedTestAssignEmployeeIds.value = [];
+  savedTestAssignError.value = '';
+  savedTestAssignSuccess.value = '';
+  showSavedTestAssignModal.value = true;
+}
+
+async function submitSavedTestAssign() {
+  if (!savedTestAssignEmployeeIds.value.length) {
+    savedTestAssignError.value = 'En az bir personel seçin.';
+    return;
+  }
+  savedTestAssignLoading.value = true;
+  savedTestAssignError.value = '';
+  try {
+    await testStore.assignTest(savedTestAssignTarget.value._id, savedTestAssignEmployeeIds.value);
+    savedTestAssignSuccess.value = `Test ${savedTestAssignEmployeeIds.value.length} personele başarıyla atandı.`;
+    savedTestAssignEmployeeIds.value = [];
+  } catch (err) {
+    savedTestAssignError.value = err.response?.data?.message ?? 'Atama başarısız.';
+  } finally {
+    savedTestAssignLoading.value = false;
+  }
+}
+
+// ─── Existing question picker ──────────────────────────────────────────────
+
+function openExistingPicker() {
+  showExistingPicker.value = true;
+  pickerStep.value = 'tests';
+  pickerSelectedTest.value = null;
+  pickerTestQuestions.value = [];
+}
+
+async function selectPickerTest(test) {
+  pickerLoading.value = true;
+  pickerSelectedTest.value = test;
+  pickerStep.value = 'questions';
+  try {
+    const full = await testStore.fetchTest(test._id);
+    pickerTestQuestions.value = full.questionIds ?? [];
+  } catch {
+    pickerTestQuestions.value = [];
+  } finally {
+    pickerLoading.value = false;
+  }
+}
+
+function addPickerQuestion(q) {
+  if (selectedQuestionIds.value.includes(q._id)) return;
+  selectedQuestionIds.value.push(q._id);
+  if (!pickerAddedQuestions.value.find((pq) => pq._id === q._id)) {
+    pickerAddedQuestions.value.push(q);
+  }
+}
+
+function isPickerQuestionAdded(id) {
+  return selectedQuestionIds.value.includes(id);
+}
+
 // ─── Auth ──────────────────────────────────────────────────────────────────
 
 async function logout() {
@@ -538,10 +632,11 @@ onMounted(async () => {
   try {
     await Promise.all([
       auth.user ? Promise.resolve() : auth.fetchMe(),
-      userStore.fetchUsers({ limit: 20 }),
+      userStore.fetchUsers({ limit: 50 }),
       analyticsStore.fetchOverview(),
       analyticsStore.fetchDepartments(),
       departmentStore.fetchDepartments(),
+      testStore.fetchTests(),
     ]);
   } catch {
     error.value = 'Veriler yüklenirken bir hata oluştu.';
@@ -649,17 +744,24 @@ onMounted(async () => {
 
           <div class="draft-bar">
             <div class="section-headline">
-              <h2>Son Kaydedilen Taslaklar</h2>
-              <a href="#" @click.prevent="activeTab = 'Test Oluşturma'">Sınırsız</a>
+              <h2>Son Oluşturulan Testler</h2>
+              <a href="#" @click.prevent="activeTab = 'Test Oluşturma'">Tümünü Gör</a>
             </div>
-            <div class="draft-grid">
-              <article class="draft-card">
-                <div><h3>Q3 Teknik Değerlendirme</h3><p>Vue.js · 12 Soru</p></div>
-                <span class="draft-meta">Ön İzleme</span>
-              </article>
-              <article class="draft-card">
-                <div><h3>Satış Yetkinlik Testi</h3><p>Genel · 8 Soru</p></div>
-                <span class="draft-meta">Ön İzleme</span>
+            <div v-if="!recentTests.length" class="empty-state small">
+              <p>Henüz oluşturulmuş test yok.</p>
+            </div>
+            <div v-else class="draft-grid">
+              <article v-for="test in recentTests" :key="test._id" class="draft-card">
+                <div>
+                  <h3>{{ test.title }}</h3>
+                  <p>{{ test.categoryId?.name ?? 'Genel' }} · {{ test.questionIds?.length ?? 0 }} Soru</p>
+                </div>
+                <button
+                  class="secondary-btn"
+                  type="button"
+                  style="padding:6px 14px;font-size:0.8rem;flex-shrink:0;"
+                  @click="openSavedTestAssign(test)"
+                >Ata</button>
               </article>
             </div>
           </div>
@@ -757,6 +859,69 @@ onMounted(async () => {
 
       <!-- ══════════════════════ TEST OLUŞTURMA ══════════════════════ -->
       <template v-else-if="activeTab === 'Test Oluşturma'">
+
+        <!-- Sub-tabs -->
+        <div class="test-subview-tabs">
+          <button
+            class="subview-tab"
+            :class="{ active: testSubView === 'wizard' }"
+            type="button"
+            @click="testSubView = 'wizard'"
+          >Yeni Test Oluştur</button>
+          <button
+            class="subview-tab"
+            :class="{ active: testSubView === 'saved' }"
+            type="button"
+            @click="testSubView = 'saved'"
+          >Kayıtlı Testler</button>
+        </div>
+
+        <!-- Kayıtlı Testler view -->
+        <template v-if="testSubView === 'saved'">
+          <section class="section-block card-surface" style="padding:28px;border-radius:26px;">
+            <div class="section-title-row" style="margin-bottom:20px;">
+              <div><h2>Kayıtlı Testler</h2><span></span></div>
+            </div>
+            <template v-if="testStore.loading">
+              <div style="text-align:center;padding:24px;">
+                <div class="spinner" style="width:32px;height:32px;margin:0 auto;"></div>
+              </div>
+            </template>
+            <div v-else-if="!testStore.tests.length" class="empty-state">
+              <p>Henüz oluşturulmuş test yok.</p>
+            </div>
+            <div v-else class="saved-tests-list">
+              <div v-for="test in testStore.tests" :key="test._id" class="saved-test-row">
+                <div class="saved-test-info">
+                  <div class="saved-test-title-row">
+                    <strong>{{ test.title }}</strong>
+                    <span
+                      class="emp-status-badge"
+                      :class="test.isActive ? 'status-active' : 'status-inactive'"
+                    >{{ test.isActive ? 'Aktif' : 'Pasif' }}</span>
+                  </div>
+                  <p>
+                    {{ test.categoryId?.name ?? 'Genel' }}
+                    · {{ TYPE_LABELS[test.type] ?? test.type }}
+                    · {{ test.questionIds?.length ?? 0 }} soru
+                    · Zorluk {{ test.difficulty }}/5
+                    · {{ test.createdBy?.fullName ?? '' }}
+                  </p>
+                </div>
+                <button
+                  class="primary-btn"
+                  type="button"
+                  style="padding:9px 18px;font-size:0.82rem;flex-shrink:0;"
+                  :disabled="!test.isActive"
+                  @click="openSavedTestAssign(test)"
+                >Ata →</button>
+              </div>
+            </div>
+          </section>
+        </template>
+
+        <!-- Wizard view -->
+        <template v-else-if="testSubView === 'wizard'">
 
         <!-- Success state -->
         <div v-if="publishSuccess" class="success-card card-surface">
@@ -902,47 +1067,51 @@ onMounted(async () => {
                   </button>
                 </div>
 
-                <div
-                  v-else-if="!filteredQuestions.length && !showAddQuestionForm"
-                  class="empty-state card-surface"
-                  style="border-radius:20px;padding:40px;"
-                >
-                  <p>Bu kategoride henüz soru yok. Aşağıdan ilk soruyu oluşturun.</p>
-                </div>
-
                 <div class="question-flow">
-                  <!-- Existing questions -->
-                  <div v-for="(q, i) in filteredQuestions" :key="q._id" class="question-row">
-                    <div class="q-left">
-                      <div
-                        class="question-num-badge"
-                        :class="{ 'q-badge-selected': isQuestionSelected(q._id) }"
-                      >{{ i + 1 }}</div>
-                      <div class="q-connector"></div>
-                    </div>
-                    <div
-                      class="question-card card-surface"
-                      :class="{ 'q-card-selected': isQuestionSelected(q._id) }"
-                    >
-                      <div class="question-card-header">
-                        <h3>{{ q.categoryId?.name ?? 'Soru' }} {{ i + 1 }}</h3>
-                        <button
-                          class="question-select-toggle"
-                          :class="{ selected: isQuestionSelected(q._id) }"
-                          type="button"
-                          @click="toggleQuestion(q._id)"
-                        >
-                          {{ isQuestionSelected(q._id) ? '✓ Eklendi' : '+ Ekle' }}
-                        </button>
+                  <!-- Action buttons -->
+                  <div v-if="!showAddQuestionForm && testCategoryId" class="step2-actions">
+                    <button class="secondary-btn" type="button" @click="showAddQuestionForm = true">
+                      + Yeni Soru Oluştur
+                    </button>
+                    <button class="secondary-btn" type="button" @click="openExistingPicker">
+                      Mevcut Sınavdan Seç
+                    </button>
+                  </div>
+
+                  <!-- Selected questions list -->
+                  <div v-if="selectedQuestionsDetails.length" class="selected-questions-section">
+                    <p class="selected-q-label">Seçilen Sorular ({{ selectedQuestionsDetails.length }})</p>
+                    <div v-for="(q, i) in selectedQuestionsDetails" :key="q._id" class="question-row">
+                      <div class="q-left">
+                        <div class="question-num-badge q-badge-selected">{{ i + 1 }}</div>
+                        <div class="q-connector"></div>
                       </div>
-                      <p class="question-body">{{ q.text }}</p>
-                      <div class="question-options">
-                        <div v-for="(opt, j) in q.options" :key="j" class="option-row">
-                          <span class="option-label-badge" :class="{ 'opt-correct': opt.isCorrect }">{{ OPTION_LABELS[j] }}</span>
-                          <span class="option-text-bar">{{ opt.text }}</span>
+                      <div class="question-card card-surface q-card-selected">
+                        <div class="question-card-header">
+                          <h3>{{ q.categoryId?.name ?? 'Soru' }} {{ i + 1 }}</h3>
+                          <button
+                            class="question-select-toggle selected"
+                            type="button"
+                            @click="toggleQuestion(q._id)"
+                          >✓ Kaldır</button>
+                        </div>
+                        <p class="question-body">{{ q.text }}</p>
+                        <div v-if="q.options?.length" class="question-options">
+                          <div v-for="(opt, j) in q.options" :key="j" class="option-row">
+                            <span class="option-label-badge" :class="{ 'opt-correct': opt.isCorrect }">{{ OPTION_LABELS[j] }}</span>
+                            <span class="option-text-bar">{{ opt.text }}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
+                  </div>
+
+                  <div
+                    v-else-if="!showAddQuestionForm && testCategoryId"
+                    class="empty-state card-surface"
+                    style="border-radius:20px;padding:40px;"
+                  >
+                    <p>Henüz soru eklenmedi. Yukarıdan yeni soru oluşturun veya mevcut sınavdan seçin.</p>
                   </div>
 
                   <!-- Inline add-question form -->
@@ -1030,17 +1199,6 @@ onMounted(async () => {
                       </div>
                     </div>
                   </div>
-
-                  <!-- Add question trigger card -->
-                  <div v-if="!showAddQuestionForm" class="question-row">
-                    <div class="q-left">
-                      <div class="question-num-badge add-badge">?</div>
-                    </div>
-                    <div class="add-question-card card-surface" @click="showAddQuestionForm = true">
-                      <span class="add-icon-lg">+</span>
-                      <span class="add-question-label">Yeni Soru Ekle</span>
-                    </div>
-                  </div>
                 </div>
               </div>
 
@@ -1113,6 +1271,7 @@ onMounted(async () => {
             </div>
           </section>
         </template>
+        </template><!-- /testSubView === 'wizard' -->
       </template>
 
       <!-- ══════════════════════ PERSONELLER ══════════════════════ -->
@@ -1178,71 +1337,84 @@ onMounted(async () => {
                 {{ chip }}
               </button>
             </div>
-            <div class="filter-dropdowns">
-              <div>
-                <label class="filter-label">Kayıt Durumu</label>
-                <select v-model="statusFilter" class="field-select">
-                  <option value="Tümü">Tümü</option>
-                  <option value="Aktif">Aktif</option>
-                  <option value="Pasif">Pasif</option>
-                </select>
-              </div>
-              <div>
-                <label class="filter-label">Son Test Durumu</label>
-                <select class="field-select">
-                  <option>Tamamlandı</option>
-                  <option>Devam Ediyor</option>
-                  <option>Atanmadı</option>
-                </select>
-              </div>
-            </div>
             <button class="primary-btn add-personnel-btn" type="button" @click="openAddEmployeeModal">
               Yeni Personel Ekle +
             </button>
           </div>
         </div>
 
+        <!-- Aktif Personeller -->
         <section class="section-block">
           <div class="section-title-row">
-            <div><h2>Tüm Personeller</h2><span></span></div>
+            <div><h2>Aktif Personeller</h2><span></span></div>
+            <span class="section-count">{{ activeEmployees.length }}</span>
           </div>
-          <div v-if="!filteredEmployees.length" class="empty-state">
-            <p>Gösterilecek personel bulunamadı.</p>
+          <div v-if="!activeEmployees.length" class="empty-state">
+            <p>Aktif personel bulunamadı.</p>
           </div>
           <div v-else class="employee-grid">
             <article
-              v-for="emp in filteredEmployees"
+              v-for="emp in activeEmployees"
               :key="emp.id"
               class="employee-card"
-              :class="[emp.accent, { 'emp-inactive': !emp.isActive }]"
+              :class="emp.accent"
             >
               <div class="employee-head">
                 <div class="employee-avatar">{{ emp.initial }}</div>
                 <div class="employee-head-info">
                   <div class="employee-name-row">
                     <h3>{{ emp.name }}</h3>
-                    <span
-                      class="emp-status-badge"
-                      :class="emp.isActive ? 'status-active' : 'status-inactive'"
-                    >{{ emp.isActive ? 'Aktif' : 'Pasif' }}</span>
+                    <span class="emp-role-badge">{{ emp.roleLabel }}</span>
                   </div>
-                  <p>{{ emp.dept }}</p>
+                  <p class="emp-dept">{{ emp.dept }}</p>
+                  <p class="emp-email">{{ emp.email }}</p>
                 </div>
               </div>
               <div class="employee-actions">
-                <button type="button" :disabled="!emp.isActive" @click="openAssignTestModal(emp)">
-                  Test ata
-                </button>
+                <button type="button" @click="openAssignTestModal(emp)">Test ata</button>
                 <button type="button" @click="activeTab = 'Analizler'">Raporu gör</button>
                 <button
                   type="button"
-                  class="emp-toggle-btn"
-                  :class="emp.isActive ? 'emp-deactivate' : 'emp-activate'"
+                  class="emp-toggle-btn emp-deactivate"
                   :disabled="togglingIds.includes(emp.id)"
                   @click="toggleUserActive(emp)"
-                >
-                  {{ togglingIds.includes(emp.id) ? '…' : (emp.isActive ? 'Deaktif Et' : 'Aktif Et') }}
-                </button>
+                >{{ togglingIds.includes(emp.id) ? '…' : 'Deaktif Et' }}</button>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- Pasif Personeller -->
+        <section v-if="inactiveEmployees.length" class="section-block">
+          <div class="section-title-row">
+            <div><h2>Pasif / Deaktif Personeller</h2><span></span></div>
+            <span class="section-count section-count-inactive">{{ inactiveEmployees.length }}</span>
+          </div>
+          <div class="employee-grid">
+            <article
+              v-for="emp in inactiveEmployees"
+              :key="emp.id"
+              class="employee-card emp-inactive"
+              :class="emp.accent"
+            >
+              <div class="employee-head">
+                <div class="employee-avatar">{{ emp.initial }}</div>
+                <div class="employee-head-info">
+                  <div class="employee-name-row">
+                    <h3>{{ emp.name }}</h3>
+                    <span class="emp-role-badge">{{ emp.roleLabel }}</span>
+                  </div>
+                  <p class="emp-dept">{{ emp.dept }}</p>
+                  <p class="emp-email">{{ emp.email }}</p>
+                </div>
+              </div>
+              <div class="employee-actions">
+                <button
+                  type="button"
+                  class="emp-toggle-btn emp-activate"
+                  :disabled="togglingIds.includes(emp.id)"
+                  @click="toggleUserActive(emp)"
+                >{{ togglingIds.includes(emp.id) ? '…' : 'Aktif Et' }}</button>
               </div>
             </article>
           </div>
@@ -1558,6 +1730,116 @@ onMounted(async () => {
             </button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- ══════════════════════ SAVED TEST ASSIGN MODAL ══════════════════════ -->
+    <div v-if="showSavedTestAssignModal" class="modal-overlay" @click.self="showSavedTestAssignModal = false">
+      <div class="modal-card card-surface">
+        <div class="modal-header">
+          <h2>Test Atama</h2>
+          <button class="modal-close" type="button" @click="showSavedTestAssignModal = false">✕</button>
+        </div>
+
+        <div v-if="savedTestAssignTarget" class="assign-target-chip">
+          <div>
+            <strong>{{ savedTestAssignTarget.title }}</strong>
+            <p>{{ savedTestAssignTarget.categoryId?.name ?? 'Genel' }} · {{ savedTestAssignTarget.questionIds?.length ?? 0 }} soru · Zorluk {{ savedTestAssignTarget.difficulty }}/5</p>
+          </div>
+        </div>
+
+        <p v-if="savedTestAssignSuccess" class="assign-feedback assign-feedback-success">✓ {{ savedTestAssignSuccess }}</p>
+        <p v-if="savedTestAssignError" class="assign-feedback assign-feedback-error">{{ savedTestAssignError }}</p>
+
+        <p class="field-label" style="margin-bottom:10px;">Atanacak personelleri seçin:</p>
+        <div class="employee-select-grid" style="max-height:340px;overflow-y:auto;">
+          <label
+            v-for="emp in employees.filter(e => e.isActive)"
+            :key="emp.id"
+            class="employee-select-item"
+            :class="{ 'item-checked': savedTestAssignEmployeeIds.includes(emp.id) }"
+          >
+            <input type="checkbox" :value="emp.id" v-model="savedTestAssignEmployeeIds" />
+            <div class="employee-select-info">
+              <div class="employee-avatar small">{{ emp.initial }}</div>
+              <div>
+                <strong>{{ emp.name }}</strong>
+                <p>{{ emp.dept }}</p>
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <div class="modal-actions">
+          <button class="secondary-btn" type="button" @click="showSavedTestAssignModal = false">İptal</button>
+          <button class="primary-btn" type="button" :disabled="savedTestAssignLoading" @click="submitSavedTestAssign">
+            {{ savedTestAssignLoading ? 'Atanıyor…' : 'Ata' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════ EXISTING QUESTION PICKER ══════════════════════ -->
+    <div v-if="showExistingPicker" class="modal-overlay" @click.self="showExistingPicker = false">
+      <div class="modal-card card-surface" style="width:min(640px,100%);">
+        <div class="modal-header">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button
+              v-if="pickerStep === 'questions'"
+              class="modal-close"
+              type="button"
+              style="background:rgba(46,125,122,0.1);color:var(--teal);"
+              @click="pickerStep = 'tests'; pickerSelectedTest = null;"
+            >←</button>
+            <h2>{{ pickerStep === 'tests' ? 'Sınav Seç' : pickerSelectedTest?.title }}</h2>
+          </div>
+          <button class="modal-close" type="button" @click="showExistingPicker = false">✕</button>
+        </div>
+
+        <template v-if="pickerStep === 'tests'">
+          <p class="section-text" style="margin-bottom:16px;">Soru almak istediğiniz sınavı seçin.</p>
+          <div v-if="!testStore.tests.length" class="empty-state"><p>Henüz kayıtlı sınav yok.</p></div>
+          <div v-else class="assign-tests-list">
+            <div v-for="test in testStore.tests" :key="test._id" class="assign-test-row">
+              <div class="assign-test-info">
+                <strong>{{ test.title }}</strong>
+                <p>{{ test.categoryId?.name ?? 'Genel' }} · {{ test.questionIds?.length ?? 0 }} soru</p>
+              </div>
+              <button class="primary-btn assign-test-btn" type="button" @click="selectPickerTest(test)">
+                Seç →
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <template v-else-if="pickerStep === 'questions'">
+          <p class="section-text" style="margin-bottom:16px;">Eklemek istediğiniz soruları seçin.</p>
+          <div v-if="pickerLoading" style="text-align:center;padding:24px;">
+            <div class="spinner" style="width:32px;height:32px;margin:0 auto;"></div>
+          </div>
+          <div v-else-if="!pickerTestQuestions.length" class="empty-state">
+            <p>Bu sınavda soru bulunamadı.</p>
+          </div>
+          <div v-else class="picker-questions-list">
+            <div v-for="(q, i) in pickerTestQuestions" :key="q._id" class="picker-question-row">
+              <div class="picker-question-info">
+                <strong>{{ i + 1 }}. {{ q.text }}</strong>
+                <p>{{ TYPE_LABELS[q.type] ?? q.type }} · Zorluk {{ q.difficulty }}/5</p>
+              </div>
+              <button
+                class="question-select-toggle"
+                :class="{ selected: isPickerQuestionAdded(q._id) }"
+                type="button"
+                :disabled="isPickerQuestionAdded(q._id)"
+                @click="addPickerQuestion(q)"
+              >{{ isPickerQuestionAdded(q._id) ? '✓ Eklendi' : '+ Ekle' }}</button>
+            </div>
+          </div>
+        </template>
+
+        <div class="modal-actions">
+          <button class="secondary-btn" type="button" @click="showExistingPicker = false">Kapat</button>
+        </div>
       </div>
     </div>
 

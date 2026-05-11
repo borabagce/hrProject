@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import api from '@/lib/api';
 
-const ROLE_LABELS = { admin: 'Yönetici', hr: 'İK Direktörü', employee: 'Personel' };
+const ROLE_LABELS = { admin: 'İK Yöneticisi', hr: 'İK Direktörü', employee: 'Personel' };
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null);

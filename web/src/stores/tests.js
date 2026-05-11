@@ -32,6 +32,11 @@ export const useTestStore = defineStore('tests', () => {
     return data.data;
   }
 
+  async function fetchTest(id) {
+    const { data } = await api.get(`/api/tests/${id}`);
+    return data.data;
+  }
+
   async function updateTest(id, payload) {
     const { data } = await api.put(`/api/tests/${id}`, payload);
     const idx = tests.value.findIndex((t) => t._id === id);
@@ -39,5 +44,5 @@ export const useTestStore = defineStore('tests', () => {
     return data.data;
   }
 
-  return { tests, total, loading, fetchTests, createTest, assignTest, updateTest };
+  return { tests, total, loading, fetchTests, fetchTest, createTest, assignTest, updateTest };
 });

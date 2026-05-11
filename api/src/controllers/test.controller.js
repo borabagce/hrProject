@@ -36,7 +36,7 @@ export const getTest = async (req, res, next) => {
     const test = await Test.findOne(filter)
       .populate('categoryId', 'name')
       .populate('createdBy', 'fullName')
-      .populate('questionIds', 'text type difficulty');
+      .populate('questionIds', 'text type difficulty options');
     if (!test) throw ApiError.notFound('Test not found');
 
     res.json({ success: true, data: test });
