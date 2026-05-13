@@ -373,8 +373,12 @@ async function assignExistingTest(test) {
   assignSuccess.value = '';
   assignLoading.value = true;
   try {
-    await testStore.assignTest(test._id, [assignTarget.value.id]);
-    assignSuccess.value = `"${test.title}" testi ${assignTarget.value.name} personeline atandı.`;
+    const result = await testStore.assignTest(test._id, [assignTarget.value.id]);
+    if (result.assigned === 0) {
+      assignError.value = `"${test.title}" testi bu personele zaten atanmış.`;
+    } else {
+      assignSuccess.value = `"${test.title}" testi ${assignTarget.value.name} personeline atandı.`;
+    }
   } catch (err) {
     assignError.value = err.response?.data?.message ?? 'Atama başarısız, tekrar deneyin.';
   } finally {
@@ -593,8 +597,14 @@ async function submitSavedTestAssign() {
   savedTestAssignLoading.value = true;
   savedTestAssignError.value = '';
   try {
-    await testStore.assignTest(savedTestAssignTarget.value._id, savedTestAssignEmployeeIds.value);
-    savedTestAssignSuccess.value = `Test ${savedTestAssignEmployeeIds.value.length} personele başarıyla atandı.`;
+    const result = await testStore.assignTest(savedTestAssignTarget.value._id, savedTestAssignEmployeeIds.value);
+    if (result.assigned === 0) {
+      savedTestAssignError.value = 'Seçilen personellere bu test zaten atanmış.';
+    } else if (result.skipped > 0) {
+      savedTestAssignSuccess.value = `Test ${result.assigned} personele atandı. ${result.skipped} personel zaten atanmıştı.`;
+    } else {
+      savedTestAssignSuccess.value = `Test ${result.assigned} personele başarıyla atandı.`;
+    }
     savedTestAssignEmployeeIds.value = [];
   } catch (err) {
     savedTestAssignError.value = err.response?.data?.message ?? 'Atama başarısız.';
