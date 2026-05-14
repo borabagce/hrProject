@@ -130,6 +130,7 @@ const pickerAddedQuestions = ref([]);
 const showSavedTestAssignModal = ref(false);
 const savedTestAssignTarget = ref(null);
 const savedTestAssignEmployeeIds = ref([]);
+const savedTestAlreadyAssignedIds = ref([]);
 const savedTestAssignLoading = ref(false);
 const savedTestAssignError = ref('');
 const savedTestAssignSuccess = ref('');
@@ -581,31 +582,52 @@ async function toggleTestExpand(test) {
   }
 }
 
-function openSavedTestAssign(test) {
+async function openSavedTestAssign(test) {
   savedTestAssignTarget.value = test;
-  savedTestAssignEmployeeIds.value = [];
   savedTestAssignError.value = '';
   savedTestAssignSuccess.value = '';
+
+  let assignments = testAssignmentsMap.value[test._id];
+  if (!assignments) {
+    try {
+      assignments = await testStore.fetchTestAssignments(test._id);
+      testAssignmentsMap.value = { ...testAssignmentsMap.value, [test._id]: assignments };
+    } catch {
+      assignments = [];
+    }
+  }
+
+  const alreadyIds = assignments.map(a => a.assignedTo._id);
+  savedTestAlreadyAssignedIds.value = alreadyIds;
+  savedTestAssignEmployeeIds.value = [...alreadyIds];
   showSavedTestAssignModal.value = true;
 }
 
 async function submitSavedTestAssign() {
-  if (!savedTestAssignEmployeeIds.value.length) {
-    savedTestAssignError.value = 'En az bir personel seçin.';
+  const newIds = savedTestAssignEmployeeIds.value.filter(
+    id => !savedTestAlreadyAssignedIds.value.includes(id)
+  );
+  if (!newIds.length) {
+    savedTestAssignError.value = savedTestAssignEmployeeIds.value.length
+      ? 'Seçili personellere bu test zaten atanmış.'
+      : 'En az bir personel seçin.';
     return;
   }
   savedTestAssignLoading.value = true;
   savedTestAssignError.value = '';
   try {
-    const result = await testStore.assignTest(savedTestAssignTarget.value._id, savedTestAssignEmployeeIds.value);
-    if (result.assigned === 0) {
-      savedTestAssignError.value = 'Seçilen personellere bu test zaten atanmış.';
-    } else if (result.skipped > 0) {
+    const result = await testStore.assignTest(savedTestAssignTarget.value._id, newIds);
+    const updatedAlready = [...savedTestAlreadyAssignedIds.value, ...newIds];
+    savedTestAlreadyAssignedIds.value = updatedAlready;
+    savedTestAssignEmployeeIds.value = [...updatedAlready];
+    const newMap = { ...testAssignmentsMap.value };
+    delete newMap[savedTestAssignTarget.value._id];
+    testAssignmentsMap.value = newMap;
+    if (result.skipped > 0) {
       savedTestAssignSuccess.value = `Test ${result.assigned} personele atandı. ${result.skipped} personel zaten atanmıştı.`;
     } else {
       savedTestAssignSuccess.value = `Test ${result.assigned} personele başarıyla atandı.`;
     }
-    savedTestAssignEmployeeIds.value = [];
   } catch (err) {
     savedTestAssignError.value = err.response?.data?.message ?? 'Atama başarısız.';
   } finally {
@@ -1845,9 +1867,17 @@ onMounted(async () => {
             v-for="emp in employees.filter(e => e.isActive)"
             :key="emp.id"
             class="employee-select-item"
-            :class="{ 'item-checked': savedTestAssignEmployeeIds.includes(emp.id) }"
+            :class="{
+              'item-checked': savedTestAssignEmployeeIds.includes(emp.id),
+              'item-already-assigned': savedTestAlreadyAssignedIds.includes(emp.id)
+            }"
           >
-            <input type="checkbox" :value="emp.id" v-model="savedTestAssignEmployeeIds" />
+            <input
+              type="checkbox"
+              :value="emp.id"
+              v-model="savedTestAssignEmployeeIds"
+              :disabled="savedTestAlreadyAssignedIds.includes(emp.id)"
+            />
             <div class="employee-select-info">
               <div class="employee-avatar small">{{ emp.initial }}</div>
               <div>
@@ -1855,6 +1885,7 @@ onMounted(async () => {
                 <p>{{ emp.dept }}</p>
               </div>
             </div>
+            <span v-if="savedTestAlreadyAssignedIds.includes(emp.id)" class="already-assigned-badge">Atanmış</span>
           </label>
         </div>
 

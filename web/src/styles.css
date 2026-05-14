@@ -2146,6 +2146,26 @@ a {
   border-color: rgba(46, 125, 122, 0.3);
 }
 
+.employee-select-item.item-already-assigned {
+  background: rgba(46, 125, 122, 0.04);
+  border-color: rgba(46, 125, 122, 0.2);
+  cursor: default;
+  opacity: 0.75;
+}
+
+.already-assigned-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--teal);
+  background: rgba(46, 125, 122, 0.1);
+  border: 1px solid rgba(46, 125, 122, 0.25);
+  border-radius: 20px;
+  padding: 2px 8px;
+}
+
 @media (max-width: 720px) {
   .field-row-2 {
     grid-template-columns: 1fr;
