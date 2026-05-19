@@ -1,5 +1,4 @@
 import { User } from '../models/User.js';
-import { Company } from '../models/Company.js';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt.js';
 import { ApiError } from '../utils/ApiError.js';
 
@@ -8,33 +7,6 @@ const tokenPayload = (user) => ({
   companyId: user.companyId.toString(),
   role: user.role,
 });
-
-export const register = async (req, res, next) => {
-  try {
-    const { companyName, industry, fullName, email, password } = req.body;
-
-    const existing = await User.findOne({ email });
-    if (existing) throw ApiError.conflict('Email already registered');
-
-    const company = await Company.create({ name: companyName, industry });
-    const user = await User.create({
-      companyId: company._id,
-      fullName,
-      email,
-      passwordHash: password,
-      role: 'admin',
-    });
-
-    const [accessToken, refreshToken] = await Promise.all([
-      signAccessToken(tokenPayload(user)),
-      signRefreshToken(tokenPayload(user)),
-    ]);
-
-    res.status(201).json({ success: true, data: { user, accessToken, refreshToken } });
-  } catch (err) {
-    next(err);
-  }
-};
 
 export const login = async (req, res, next) => {
   try {

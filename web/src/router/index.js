@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import { useSysAdminStore } from '@/stores/sysadmin';
 
 const routes = [
   {
@@ -14,6 +15,18 @@ const routes = [
     component: () => import('@/views/DashboardView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/system/login',
+    name: 'SysAdminLogin',
+    component: () => import('@/views/SysAdminLoginView.vue'),
+    meta: { sysGuest: true },
+  },
+  {
+    path: '/system',
+    name: 'SysAdminDashboard',
+    component: () => import('@/views/SysAdminDashboardView.vue'),
+    meta: { requiresSysAuth: true },
+  },
 ];
 
 const router = createRouter({
@@ -22,6 +35,21 @@ const router = createRouter({
 });
 
 router.beforeEach(async (to) => {
+  if (to.meta.requiresSysAuth || to.meta.sysGuest) {
+    const sys = useSysAdminStore();
+    if (to.meta.requiresSysAuth && !sys.isAuthenticated) return { name: 'SysAdminLogin' };
+    if (to.meta.sysGuest && sys.isAuthenticated) return { name: 'SysAdminDashboard' };
+    if (to.meta.requiresSysAuth && sys.isAuthenticated && !sys.admin) {
+      try {
+        await sys.fetchMe();
+      } catch {
+        sys.logout();
+        return { name: 'SysAdminLogin' };
+      }
+    }
+    return;
+  }
+
   const auth = useAuthStore();
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) return { name: 'Login' };
