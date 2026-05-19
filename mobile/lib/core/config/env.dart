@@ -12,7 +12,7 @@ class Env {
   static String get apiUrl =>
       const String.fromEnvironment(_kApiUrl, defaultValue: '').isNotEmpty
           ? const String.fromEnvironment(_kApiUrl)
-          : (dotenv.maybeGet(_kApiUrl) ?? 'http://hrproject-production.up.railway.app:8080/api');
+          : (dotenv.maybeGet(_kApiUrl) ?? 'https://hrproject-production.up.railway.app/api');
 
   static String? get ntfyUrl =>
       const String.fromEnvironment(_kNtfyUrl, defaultValue: '').isNotEmpty

@@ -201,10 +201,7 @@ export const getSessionResult = async (req, res, next) => {
     });
     if (!session) throw ApiError.notFound('Completed session not found');
 
-    const answers = await UserAnswer.find({ sessionId: session._id }).populate(
-      'questionId',
-      'text options categoryId difficulty'
-    );
+    const answers = await UserAnswer.find({ sessionId: session._id });
 
     res.json({ success: true, data: { session, answers } });
   } catch (err) {

@@ -142,6 +142,12 @@ const assignLoading = ref(false);
 const assignError = ref('');
 const assignSuccess = ref('');
 
+// ─── Employee report modal ─────────────────────────────────────────────────
+const showEmployeeReportModal = ref(false);
+const employeeReportTarget = ref(null);
+const employeeReportData = ref(null);
+const employeeReportLoading = ref(false);
+
 // ─── Employee add modal ────────────────────────────────────────────────────
 const showAddEmployeeModal = ref(false);
 const addEmployeeLoading = ref(false);
@@ -543,6 +549,20 @@ async function toggleUserActive(emp) {
   }
 }
 
+async function openEmployeeReport(emp) {
+  employeeReportTarget.value = emp;
+  employeeReportData.value = null;
+  employeeReportLoading.value = true;
+  showEmployeeReportModal.value = true;
+  try {
+    employeeReportData.value = await analyticsStore.fetchEmployeeAnalytics(emp.id);
+  } catch {
+    employeeReportData.value = null;
+  } finally {
+    employeeReportLoading.value = false;
+  }
+}
+
 async function submitAddEmployee() {
   addEmployeeError.value = '';
   addEmployeeLoading.value = true;
@@ -858,7 +878,7 @@ onMounted(async () => {
               </div>
               <div class="employee-actions">
                 <button type="button" @click="openAssignTestModal(emp)">Test ata</button>
-                <button type="button" @click="activeTab = 'Analizler'">Raporu gör</button>
+                <button type="button" @click="openEmployeeReport(emp)">Raporu gör</button>
                 <button type="button" @click="activeTab = 'Personeller'">Takip</button>
               </div>
             </article>
@@ -1482,7 +1502,7 @@ onMounted(async () => {
               </div>
               <div class="employee-actions">
                 <button type="button" @click="openAssignTestModal(emp)">Test ata</button>
-                <button type="button" @click="activeTab = 'Analizler'">Raporu gör</button>
+                <button type="button" @click="openEmployeeReport(emp)">Raporu gör</button>
                 <button
                   type="button"
                   class="emp-toggle-btn emp-deactivate"
@@ -1958,6 +1978,82 @@ onMounted(async () => {
 
         <div class="modal-actions">
           <button class="secondary-btn" type="button" @click="showExistingPicker = false">Kapat</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════ EMPLOYEE REPORT MODAL ══════════════════════ -->
+    <div v-if="showEmployeeReportModal" class="modal-overlay" @click.self="showEmployeeReportModal = false">
+      <div class="modal-card card-surface" style="width:min(680px,100%);max-height:80vh;overflow-y:auto;">
+        <div class="modal-header">
+          <h2>{{ employeeReportTarget?.name ?? 'Rapor' }}</h2>
+          <button class="modal-close" type="button" @click="showEmployeeReportModal = false">✕</button>
+        </div>
+
+        <div v-if="employeeReportLoading" style="text-align:center;padding:32px 0;">
+          <div class="spinner" style="width:32px;height:32px;margin:0 auto;"></div>
+        </div>
+
+        <template v-else-if="employeeReportData">
+          <div class="assign-target-chip" style="margin-bottom:20px;">
+            <div class="employee-avatar small">{{ employeeReportTarget?.initial }}</div>
+            <div>
+              <strong>{{ employeeReportData.user?.fullName }}</strong>
+              <p>{{ employeeReportData.user?.email }}</p>
+            </div>
+          </div>
+
+          <div v-if="!employeeReportData.sessionHistory?.length" class="empty-state small">
+            <p>Henüz tamamlanmış test oturumu yok.</p>
+          </div>
+
+          <template v-else>
+            <h3 style="margin-bottom:12px;font-size:14px;opacity:.7;text-transform:uppercase;letter-spacing:.06em;">Test Geçmişi</h3>
+            <div class="reports-list">
+              <div
+                v-for="(s, i) in employeeReportData.sessionHistory"
+                :key="i"
+                class="report-list-row"
+              >
+                <span class="report-type-chip">Hafta {{ s.weekNumber }}/{{ s.year }}</span>
+                <div class="report-list-meta">
+                  <strong>%{{ s.scorePercent }} — {{ s.correctCount }}/{{ s.totalQuestions }} doğru</strong>
+                  <p>{{ s.completedAt ? new Date(s.completedAt).toLocaleDateString('tr-TR') : '—' }}</p>
+                </div>
+                <span
+                  class="risk-badge"
+                  :class="s.scorePercent >= 70 ? 'risk-low' : s.scorePercent >= 40 ? 'risk-medium' : 'risk-high'"
+                >
+                  {{ s.scorePercent >= 70 ? 'İyi' : s.scorePercent >= 40 ? 'Orta' : 'Düşük' }}
+                </span>
+              </div>
+            </div>
+
+            <template v-if="employeeReportData.wrongByCategory?.length">
+              <h3 style="margin:20px 0 12px;font-size:14px;opacity:.7;text-transform:uppercase;letter-spacing:.06em;">Kategori Bazlı Hata Oranı</h3>
+              <div class="reports-list">
+                <div
+                  v-for="(c, i) in employeeReportData.wrongByCategory"
+                  :key="i"
+                  class="report-list-row"
+                >
+                  <span class="report-type-chip">{{ c.categoryName }}</span>
+                  <div class="report-list-meta">
+                    <strong>%{{ c.errorRate?.toFixed(1) }} hata oranı</strong>
+                    <p>{{ c.wrong }}/{{ c.total }} yanlış</p>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </template>
+        </template>
+
+        <div v-else class="empty-state small">
+          <p>Rapor yüklenemedi.</p>
+        </div>
+
+        <div class="modal-actions">
+          <button class="secondary-btn" type="button" @click="showEmployeeReportModal = false">Kapat</button>
         </div>
       </div>
     </div>
