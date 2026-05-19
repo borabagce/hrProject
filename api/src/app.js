@@ -19,6 +19,8 @@ import systemAdminRoutes from './routes/systemAdmin.routes.js';
 
 const app = express();
 
+app.set('trust proxy', 1);
+
 app.use(helmet());
 const allowedOrigins = process.env.CORS_ORIGIN?.split(',').map((s) => s.trim()).filter(Boolean) ?? [];
 app.use(

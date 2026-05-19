@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/server.js",
-    "start": "node src/server.js",
+    "start": "node scripts/seedSystemAdmin.js && node src/server.js",
     "seed:sysadmin": "node scripts/seedSystemAdmin.js"
   },
   "dependencies": {
