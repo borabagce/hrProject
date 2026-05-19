@@ -59,6 +59,31 @@ export const login = async (req, res, next) => {
   }
 };
 
+export const mobileLogin = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email, isActive: true }).select('+passwordHash');
+    if (!user) throw ApiError.unauthorized('Invalid credentials');
+
+    const match = await user.comparePassword(password);
+    if (!match) throw ApiError.unauthorized('Invalid credentials');
+
+    if (user.role !== 'employee') {
+      throw ApiError.forbidden('Bu uygulama yalnızca çalışanlar için ayrılmıştır.');
+    }
+
+    const [accessToken, refreshToken] = await Promise.all([
+      signAccessToken(tokenPayload(user)),
+      signRefreshToken(tokenPayload(user)),
+    ]);
+
+    res.json({ success: true, data: { user, accessToken, refreshToken } });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const refreshToken = async (req, res, next) => {
   try {
     const { refreshToken: token } = req.body;
