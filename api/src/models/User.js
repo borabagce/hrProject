@@ -15,7 +15,7 @@ const userSchema = new mongoose.Schema(
     fullName: { type: String, required: true, trim: true, maxlength: 100 },
     email: { type: String, required: true, lowercase: true, trim: true, maxlength: 150 },
     passwordHash: { type: String, required: true, select: false },
-    role: { type: String, enum: ['admin', 'hr', 'employee'], default: 'employee' },
+    role: { type: String, enum: ['admin', 'hr', 'manager', 'employee'], default: 'employee' },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }

@@ -5,12 +5,21 @@ import { User } from '../models/User.js';
 import { UserKnowledgeProfile } from '../models/UserKnowledgeProfile.js';
 import { HrReport } from '../models/HrReport.js';
 import { ApiError } from '../utils/ApiError.js';
+import { effectiveMemoryStrengthExpr } from '../services/sm2.js';
+
+const RISK_THRESHOLDS = {
+  highScore: 40,
+  mediumScore: 70,
+  highDecay: 0.7,
+  mediumDecay: 0.4,
+  minSampleSize: 5,
+};
 
 export const getCompanyOverview = async (req, res, next) => {
   try {
     const companyId = new mongoose.Types.ObjectId(req.user.companyId);
 
-    const [sessionStats, topWrongQuestions] = await Promise.all([
+    const [sessionStats, topWrongQuestions, knowledgeOverview, weakestCategories] = await Promise.all([
       TestSession.aggregate([
         { $match: { companyId, isCompleted: true } },
         {
@@ -20,6 +29,15 @@ export const getCompanyOverview = async (req, res, next) => {
             avgScore: { $avg: '$scorePercent' },
             minScore: { $min: '$scorePercent' },
             maxScore: { $max: '$scorePercent' },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            totalSessions: 1,
+            avgScore: { $round: ['$avgScore', 1] },
+            minScore: 1,
+            maxScore: 1,
           },
         },
       ]),
@@ -46,13 +64,95 @@ export const getCompanyOverview = async (req, res, next) => {
           },
         },
       ]),
+      UserKnowledgeProfile.aggregate([
+        { $match: { companyId } },
+        {
+          $addFields: {
+            effectiveStrength: effectiveMemoryStrengthExpr,
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalTracked: { $sum: 1 },
+            dueCount: { $sum: { $cond: [{ $lte: ['$nextReviewDate', '$$NOW'] }, 1, 0] } },
+            avgEffectiveStrength: { $avg: '$effectiveStrength' },
+            avgEasinessFactor: { $avg: '$easinessFactor' },
+            activeLearners: { $addToSet: '$userId' },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            totalTracked: 1,
+            dueCount: 1,
+            activeLearnerCount: { $size: '$activeLearners' },
+            avgEffectiveStrength: { $round: ['$avgEffectiveStrength', 4] },
+            avgEasinessFactor: { $round: ['$avgEasinessFactor', 2] },
+          },
+        },
+      ]),
+      UserKnowledgeProfile.aggregate([
+        { $match: { companyId } },
+        {
+          $addFields: { effectiveStrength: effectiveMemoryStrengthExpr },
+        },
+        {
+          $lookup: {
+            from: 'questions',
+            localField: 'questionId',
+            foreignField: '_id',
+            as: 'question',
+          },
+        },
+        { $unwind: '$question' },
+        {
+          $group: {
+            _id: '$question.categoryId',
+            avgStrength: { $avg: '$effectiveStrength' },
+            sampleSize: { $sum: 1 },
+          },
+        },
+        { $match: { sampleSize: { $gte: RISK_THRESHOLDS.minSampleSize } } },
+        {
+          $lookup: {
+            from: 'categories',
+            localField: '_id',
+            foreignField: '_id',
+            as: 'category',
+          },
+        },
+        { $unwind: '$category' },
+        {
+          $project: {
+            categoryName: '$category.name',
+            avgStrength: { $round: ['$avgStrength', 4] },
+            sampleSize: 1,
+          },
+        },
+        { $sort: { avgStrength: 1 } },
+        { $limit: 5 },
+      ]),
     ]);
 
     res.json({
       success: true,
       data: {
-        sessionStats: sessionStats[0] || {},
+        sessionStats: sessionStats[0] ?? {
+          totalSessions: 0,
+          avgScore: 0,
+          minScore: 0,
+          maxScore: 0,
+        },
         topWrongQuestions,
+        knowledgeOverview: knowledgeOverview[0] ?? {
+          totalTracked: 0,
+          dueCount: 0,
+          activeLearnerCount: 0,
+          avgEffectiveStrength: 0,
+          avgEasinessFactor: 2.5,
+        },
+        weakestCategories,
       },
     });
   } catch (err) {
@@ -68,11 +168,11 @@ export const getEmployeeAnalytics = async (req, res, next) => {
     const targetUser = await User.findOne({ _id: userId, companyId });
     if (!targetUser) throw ApiError.notFound('User not found');
 
-    const [sessionHistory, wrongByCategory, weeklyTrend] = await Promise.all([
-      TestSession.find({ userId, isCompleted: true })
+    const [sessionHistory, wrongByCategory, weeklyTrend, knowledgeStats] = await Promise.all([
+      TestSession.find({ userId, companyId, isCompleted: true })
         .sort({ completedAt: -1 })
         .limit(20)
-        .select('weekNumber year scorePercent correctCount totalQuestions completedAt'),
+        .select('weekNumber year scorePercent correctCount totalQuestions completedAt sessionType'),
 
       UserAnswer.aggregate([
         { $match: { userId, companyId } },
@@ -106,20 +206,48 @@ export const getEmployeeAnalytics = async (req, res, next) => {
             categoryName: '$category.name',
             total: 1,
             wrong: 1,
-            errorRate: { $multiply: [{ $divide: ['$wrong', '$total'] }, 100] },
+            errorRate: {
+              $round: [{ $multiply: [{ $divide: ['$wrong', '$total'] }, 100] }, 1],
+            },
           },
         },
         { $sort: { errorRate: -1 } },
       ]),
 
       TestSession.aggregate([
-        { $match: { userId, isCompleted: true } },
-        { $sort: { year: 1, weekNumber: 1 } },
+        { $match: { userId, companyId, isCompleted: true } },
+        { $sort: { year: -1, weekNumber: -1 } },
         { $limit: 12 },
+        { $sort: { year: 1, weekNumber: 1 } },
         {
           $project: {
-            label: { $concat: ['Week ', { $toString: '$weekNumber' }, '/', { $toString: '$year' }] },
+            label: {
+              $concat: ['W', { $toString: '$weekNumber' }, '/', { $toString: '$year' }],
+            },
             score: '$scorePercent',
+          },
+        },
+      ]),
+
+      UserKnowledgeProfile.aggregate([
+        { $match: { userId, companyId } },
+        { $addFields: { effectiveStrength: effectiveMemoryStrengthExpr } },
+        {
+          $group: {
+            _id: null,
+            totalTracked: { $sum: 1 },
+            dueCount: { $sum: { $cond: [{ $lte: ['$nextReviewDate', '$$NOW'] }, 1, 0] } },
+            avgEffectiveStrength: { $avg: '$effectiveStrength' },
+            avgEasinessFactor: { $avg: '$easinessFactor' },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            totalTracked: 1,
+            dueCount: 1,
+            avgEffectiveStrength: { $round: ['$avgEffectiveStrength', 4] },
+            avgEasinessFactor: { $round: ['$avgEasinessFactor', 2] },
           },
         },
       ]),
@@ -132,6 +260,12 @@ export const getEmployeeAnalytics = async (req, res, next) => {
         sessionHistory,
         wrongByCategory,
         weeklyTrend,
+        knowledgeStats: knowledgeStats[0] ?? {
+          totalTracked: 0,
+          dueCount: 0,
+          avgEffectiveStrength: 0,
+          avgEasinessFactor: 2.5,
+        },
       },
     });
   } catch (err) {
@@ -281,19 +415,22 @@ export const generateReport = async (req, res, next) => {
       ]),
       UserKnowledgeProfile.aggregate([
         { $match: { companyId } },
+        { $addFields: { effectiveStrength: effectiveMemoryStrengthExpr } },
         {
           $group: {
             _id: null,
-            avgMemoryStrength: { $avg: '$memoryStrength' },
+            sampleSize: { $sum: 1 },
+            avgEffectiveStrength: { $avg: '$effectiveStrength' },
             avgEasinessFactor: { $avg: '$easinessFactor' },
           },
         },
         {
           $project: {
             _id: 0,
-            avgMemoryStrength: { $round: ['$avgMemoryStrength', 4] },
+            sampleSize: 1,
+            avgEffectiveStrength: { $round: ['$avgEffectiveStrength', 4] },
             decayRate: {
-              $round: [{ $subtract: [1, '$avgMemoryStrength'] }, 4],
+              $round: [{ $subtract: [1, '$avgEffectiveStrength'] }, 4],
             },
           },
         },
@@ -343,15 +480,26 @@ export const generateReport = async (req, res, next) => {
     ]);
 
     const session = sessionStats[0] ?? { totalSessions: 0, avgScore: 0, activeEmployeeCount: 0 };
-    const knowledge = knowledgeStats[0] ?? { avgMemoryStrength: 0, decayRate: 1 };
+    const knowledge = knowledgeStats[0] ?? { sampleSize: 0, avgEffectiveStrength: 0, decayRate: 0 };
 
-    const avgScore = session.avgScore ?? 0;
-    const decayRate = knowledge.decayRate ?? 1;
+    const hasKnowledgeSample = (knowledge.sampleSize ?? 0) >= RISK_THRESHOLDS.minSampleSize;
+    const hasSessionSample = (session.totalSessions ?? 0) > 0;
 
     let riskLevel;
-    if (avgScore < 40 || decayRate > 0.7) riskLevel = 'high';
-    else if (avgScore < 70 || decayRate > 0.4) riskLevel = 'medium';
-    else riskLevel = 'low';
+    if (!hasSessionSample && !hasKnowledgeSample) {
+      riskLevel = 'unknown';
+    } else {
+      const score = hasSessionSample ? session.avgScore : null;
+      const decay = hasKnowledgeSample ? knowledge.decayRate : null;
+      const highByScore = score !== null && score < RISK_THRESHOLDS.highScore;
+      const highByDecay = decay !== null && decay > RISK_THRESHOLDS.highDecay;
+      const medByScore = score !== null && score < RISK_THRESHOLDS.mediumScore;
+      const medByDecay = decay !== null && decay > RISK_THRESHOLDS.mediumDecay;
+
+      if (highByScore || highByDecay) riskLevel = 'high';
+      else if (medByScore || medByDecay) riskLevel = 'medium';
+      else riskLevel = 'low';
+    }
 
     const report = await HrReport.create({
       companyId: req.user.companyId,
@@ -359,8 +507,8 @@ export const generateReport = async (req, res, next) => {
       reportType,
       periodStart: start,
       periodEnd: end,
-      avgScore,
-      decayRate,
+      avgScore: session.avgScore ?? 0,
+      decayRate: knowledge.decayRate ?? 0,
       riskLevel,
       reportData: {
         sessionStats: session,

@@ -44,7 +44,7 @@ router.post(
     body('fullName').trim().notEmpty().isLength({ max: 100 }),
     body('email').isEmail().normalizeEmail(),
     body('password').isLength({ min: 8, max: 72 }),
-    body('role').optional().isIn(['admin', 'hr', 'employee']),
+    body('role').optional().isIn(['admin', 'hr', 'manager', 'employee']),
     body('departmentId').optional().isMongoId(),
   ],
   validate,
@@ -57,7 +57,7 @@ router.put(
   [
     param('id').isMongoId(),
     body('fullName').optional().trim().notEmpty().isLength({ max: 100 }),
-    body('role').optional().isIn(['admin', 'hr', 'employee']),
+    body('role').optional().isIn(['admin', 'hr', 'manager', 'employee']),
     body('departmentId').optional().isMongoId(),
     body('isActive').optional().isBoolean(),
   ],

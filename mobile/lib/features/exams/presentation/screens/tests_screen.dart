@@ -212,15 +212,17 @@ class _TestsScreenState extends ConsumerState<TestsScreen>
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 220,
               crossAxisSpacing: AppDimens.spaceMd,
               mainAxisSpacing: AppDimens.spaceMd,
-              childAspectRatio: 0.9,
+              mainAxisExtent: 180,
             ),
             itemCount: completed.length,
-            itemBuilder: (BuildContext c, int i) =>
-                _CompletedTile(assignment: completed[i], onTap: () => _open(completed[i])),
+            itemBuilder: (BuildContext c, int i) => _CompletedTile(
+              assignment: completed[i],
+              onTap: () => _open(completed[i]),
+            ),
           ),
         ],
       ],

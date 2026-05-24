@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 const testSchema = new mongoose.Schema(
   {
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
+    departmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Department', default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     title: { type: String, required: true, trim: true, maxlength: 200 },
     categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: null },
@@ -18,5 +19,6 @@ const testSchema = new mongoose.Schema(
 testSchema.index({ companyId: 1, isActive: 1 });
 testSchema.index({ companyId: 1, categoryId: 1 });
 testSchema.index({ companyId: 1, createdBy: 1 });
+testSchema.index({ companyId: 1, departmentId: 1 });
 
 export const Test = mongoose.model('Test', testSchema);

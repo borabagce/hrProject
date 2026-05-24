@@ -135,7 +135,7 @@ export const submitAnswer = async (req, res, next) => {
     const alreadyAnswered = await UserAnswer.findOne({ sessionId: session._id, questionId });
     if (alreadyAnswered) throw ApiError.conflict('Question already answered');
 
-    const question = await Question.findById(questionId).select('options');
+    const question = await Question.findById(questionId).select('options difficulty');
     const correctOption = question.options.find((o) => o.isCorrect);
     const isCorrect = correctOption.order === selectedOptionOrder;
 
@@ -149,7 +149,7 @@ export const submitAnswer = async (req, res, next) => {
       responseTimeSec: responseTimeSec ?? null,
     });
 
-    const quality = deriveQuality(isCorrect, responseTimeSec ?? null);
+    const quality = deriveQuality(isCorrect, responseTimeSec ?? null, question.difficulty);
     const existing = await UserKnowledgeProfile.findOne({
       userId: req.user._id,
       questionId,

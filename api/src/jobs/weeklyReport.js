@@ -5,6 +5,32 @@ import { TestSession } from '../models/TestSession.js';
 import { UserKnowledgeProfile } from '../models/UserKnowledgeProfile.js';
 import { HrReport } from '../models/HrReport.js';
 import { User } from '../models/User.js';
+import { effectiveMemoryStrengthExpr } from '../services/sm2.js';
+
+const RISK = {
+  highScore: 40,
+  mediumScore: 70,
+  highDecay: 0.7,
+  mediumDecay: 0.4,
+  minSampleSize: 5,
+};
+
+function classifyRisk(session, knowledge) {
+  const hasSessionSample = (session.totalSessions ?? 0) > 0;
+  const hasKnowledgeSample = (knowledge.sampleSize ?? 0) >= RISK.minSampleSize;
+  if (!hasSessionSample && !hasKnowledgeSample) return 'unknown';
+
+  const score = hasSessionSample ? session.avgScore : null;
+  const decay = hasKnowledgeSample ? knowledge.decayRate : null;
+  const highByScore = score !== null && score < RISK.highScore;
+  const highByDecay = decay !== null && decay > RISK.highDecay;
+  const medByScore = score !== null && score < RISK.mediumScore;
+  const medByDecay = decay !== null && decay > RISK.mediumDecay;
+
+  if (highByScore || highByDecay) return 'high';
+  if (medByScore || medByDecay) return 'medium';
+  return 'low';
+}
 
 async function generateWeeklyReportForCompany(company) {
   const now = new Date();
@@ -45,17 +71,20 @@ async function generateWeeklyReportForCompany(company) {
     ]),
     UserKnowledgeProfile.aggregate([
       { $match: { companyId } },
+      { $addFields: { effectiveStrength: effectiveMemoryStrengthExpr } },
       {
         $group: {
           _id: null,
-          avgMemoryStrength: { $avg: '$memoryStrength' },
+          sampleSize: { $sum: 1 },
+          avgEffectiveStrength: { $avg: '$effectiveStrength' },
         },
       },
       {
         $project: {
           _id: 0,
-          avgMemoryStrength: { $round: ['$avgMemoryStrength', 4] },
-          decayRate: { $round: [{ $subtract: [1, '$avgMemoryStrength'] }, 4] },
+          sampleSize: 1,
+          avgEffectiveStrength: { $round: ['$avgEffectiveStrength', 4] },
+          decayRate: { $round: [{ $subtract: [1, '$avgEffectiveStrength'] }, 4] },
         },
       },
     ]),
@@ -94,17 +123,11 @@ async function generateWeeklyReportForCompany(company) {
   ]);
 
   const session = sessionStats[0] ?? { totalSessions: 0, avgScore: 0, activeEmployeeCount: 0 };
-  const knowledge = knowledgeStats[0] ?? { avgMemoryStrength: 0, decayRate: 1 };
+  const knowledge = knowledgeStats[0] ?? { sampleSize: 0, avgEffectiveStrength: 0, decayRate: 0 };
 
   if (session.totalSessions === 0) return;
 
-  const avgScore = session.avgScore ?? 0;
-  const decayRate = knowledge.decayRate ?? 1;
-
-  let riskLevel;
-  if (avgScore < 40 || decayRate > 0.7) riskLevel = 'high';
-  else if (avgScore < 70 || decayRate > 0.4) riskLevel = 'medium';
-  else riskLevel = 'low';
+  const riskLevel = classifyRisk(session, knowledge);
 
   const adminUser = await User.findOne({ companyId, role: 'admin' }).select('_id').lean();
   if (!adminUser) return;
@@ -115,15 +138,14 @@ async function generateWeeklyReportForCompany(company) {
     reportType: 'weekly_summary',
     periodStart,
     periodEnd,
-    avgScore,
-    decayRate,
+    avgScore: session.avgScore ?? 0,
+    decayRate: knowledge.decayRate ?? 0,
     riskLevel,
     reportData: { sessionStats: session, knowledgeStats: knowledge, departmentBreakdown },
   });
 }
 
 export function startWeeklyReportJob() {
-  // Every Monday at 01:00
   cron.schedule('0 1 * * 1', async () => {
     const companies = await Company.find({ isActive: true }).select('_id').lean();
     await Promise.allSettled(companies.map(generateWeeklyReportForCompany));

@@ -21,6 +21,7 @@ router.get(
   '/',
   [
     query('categoryId').optional().isMongoId(),
+    query('departmentId').optional().isMongoId(),
     query('isActive').optional().isBoolean(),
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),
@@ -33,10 +34,11 @@ router.get('/:id', [param('id').isMongoId()], validate, getTest);
 
 router.post(
   '/',
-  authorize('admin', 'hr'),
+  authorize('admin', 'hr', 'manager'),
   [
     body('title').trim().notEmpty().isLength({ max: 200 }),
     body('categoryId').optional().isMongoId(),
+    body('departmentId').optional().isMongoId(),
     body('type').isIn(['multiple_choice', 'true_false', 'mixed']),
     body('difficulty').isInt({ min: 1, max: 5 }),
     body('questionIds').optional().isArray(),
@@ -49,11 +51,12 @@ router.post(
 
 router.put(
   '/:id',
-  authorize('admin', 'hr'),
+  authorize('admin', 'hr', 'manager'),
   [
     param('id').isMongoId(),
     body('title').optional().trim().notEmpty().isLength({ max: 200 }),
     body('categoryId').optional().isMongoId(),
+    body('departmentId').optional().isMongoId(),
     body('type').optional().isIn(['multiple_choice', 'true_false', 'mixed']),
     body('difficulty').optional().isInt({ min: 1, max: 5 }),
     body('questionIds').optional().isArray(),
@@ -67,7 +70,7 @@ router.put(
 
 router.delete(
   '/:id',
-  authorize('admin', 'hr'),
+  authorize('admin', 'hr', 'manager'),
   [param('id').isMongoId()],
   validate,
   deleteTest
@@ -75,7 +78,7 @@ router.delete(
 
 router.post(
   '/:id/assign',
-  authorize('admin', 'hr'),
+  authorize('admin', 'hr', 'manager'),
   [
     param('id').isMongoId(),
     body('userIds').isArray({ min: 1 }),
@@ -88,7 +91,7 @@ router.post(
 
 router.get(
   '/:id/assignments',
-  authorize('admin', 'hr'),
+  authorize('admin', 'hr', 'manager'),
   [param('id').isMongoId()],
   validate,
   getTestAssignments

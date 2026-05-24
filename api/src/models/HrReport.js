@@ -13,7 +13,7 @@ const hrReportSchema = new mongoose.Schema(
     periodEnd: { type: Date, required: true },
     avgScore: { type: Number, default: null },
     decayRate: { type: Number, default: null },
-    riskLevel: { type: String, enum: ['low', 'medium', 'high'], default: null },
+    riskLevel: { type: String, enum: ['low', 'medium', 'high', 'unknown'], default: null },
     reportData: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }

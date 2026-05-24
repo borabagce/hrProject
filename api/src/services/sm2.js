@@ -1,12 +1,23 @@
 const INITIAL_EASINESS = 2.5;
 const MIN_EASINESS = 1.3;
+const MS_PER_DAY = 86400000;
 
-export function deriveQuality(isCorrect, responseTimeSec) {
-  if (!isCorrect) return 1;
-  if (responseTimeSec == null) return 4;
-  if (responseTimeSec > 60) return 3;
-  if (responseTimeSec > 20) return 4;
-  return 5;
+export function deriveQuality(isCorrect, responseTimeSec, difficulty = 3) {
+  if (!isCorrect) {
+    if (difficulty >= 4) return 2;
+    if (difficulty === 3) return 1;
+    return 0;
+  }
+
+  let base;
+  if (responseTimeSec == null) base = 4;
+  else if (responseTimeSec <= 20) base = 5;
+  else if (responseTimeSec <= 60) base = 4;
+  else base = 3;
+
+  if (difficulty >= 4 && base === 3) base = 4;
+
+  return base;
 }
 
 export function computeSm2(profile, quality) {
@@ -49,3 +60,34 @@ export function defaultProfile() {
     intervalDays: 1,
   };
 }
+
+export function effectiveMemoryStrength(profile, now = new Date()) {
+  const base = profile.memoryStrength ?? 0;
+  if (base === 0) return 0;
+  const last = profile.updatedAt ?? profile.createdAt ?? now;
+  const elapsedDays = Math.max(0, (now - new Date(last)) / MS_PER_DAY);
+  const tau = Math.max(
+    1,
+    (profile.intervalDays ?? 1) * (profile.easinessFactor ?? INITIAL_EASINESS)
+  );
+  return parseFloat((base * Math.exp(-elapsedDays / tau)).toFixed(4));
+}
+
+export const effectiveMemoryStrengthExpr = {
+  $multiply: [
+    '$memoryStrength',
+    {
+      $exp: {
+        $multiply: [
+          -1,
+          {
+            $divide: [
+              { $divide: [{ $subtract: ['$$NOW', '$updatedAt'] }, MS_PER_DAY] },
+              { $max: [1, { $multiply: ['$intervalDays', '$easinessFactor'] }] },
+            ],
+          },
+        ],
+      },
+    },
+  ],
+};
