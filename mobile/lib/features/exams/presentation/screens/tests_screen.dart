@@ -22,8 +22,28 @@ class TestsScreen extends ConsumerStatefulWidget {
   ConsumerState<TestsScreen> createState() => _TestsScreenState();
 }
 
-class _TestsScreenState extends ConsumerState<TestsScreen> {
+class _TestsScreenState extends ConsumerState<TestsScreen>
+    with WidgetsBindingObserver {
   String _search = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(assignmentsProvider);
+    }
+  }
 
   bool _matches(Assignment a) {
     if (_search.isEmpty) return true;
@@ -42,6 +62,7 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
         await ref.read(examRepositoryProvider.future);
     try {
       final session = await repo.startAssignment(a.id);
+      ref.invalidate(assignmentsProvider);
       if (mounted) {
         context.push(
           '${AppRoutes.exam}/${session.id}?assignmentId=${a.id}',

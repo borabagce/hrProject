@@ -10,6 +10,7 @@ import '../../../../core/widgets/empty_state.dart';
 import '../../data/exam_repository.dart';
 import '../../domain/exam_question.dart';
 import '../../domain/test_session.dart';
+import '../../providers/assignments_provider.dart';
 import '../../providers/exam_session_notifier.dart';
 import '../widgets/exam_progress_header.dart';
 import '../widgets/option_tile.dart';
@@ -82,6 +83,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
             await ref.read(examRepositoryProvider.future);
         await repo.completeAssignment(widget.assignmentId!);
       }
+      ref.invalidate(assignmentsProvider);
       if (mounted) {
         context.go('${AppRoutes.examResult}/${widget.sessionId}');
       }

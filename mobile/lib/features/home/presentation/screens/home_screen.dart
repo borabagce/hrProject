@@ -21,30 +21,52 @@ import '../widgets/home_header.dart';
 import '../widgets/profile_strip.dart';
 import '../widgets/quick_actions.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(assignmentsProvider);
+    }
+  }
 
   String _firstName(String full) {
     final List<String> parts = full.trim().split(RegExp(r'\s+'));
     return parts.isEmpty ? '' : parts.first;
   }
 
-  Future<void> _startAssignment(
-    BuildContext context,
-    WidgetRef ref,
-    Assignment a,
-  ) async {
+  Future<void> _startAssignment(Assignment a) async {
     final ExamRepository repo =
         await ref.read(examRepositoryProvider.future);
     try {
       final session = await repo.startAssignment(a.id);
-      if (context.mounted) {
+      ref.invalidate(assignmentsProvider);
+      if (mounted) {
         context.push(
           '${AppRoutes.exam}/${session.id}?assignmentId=${a.id}',
         );
       }
     } catch (e) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.toString())),
         );
@@ -53,7 +75,7 @@ class HomeScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final AuthState? auth = ref.watch(authNotifierProvider).valueOrNull;
     final String name = switch (auth) {
       AuthAuthenticated(:final user) => _firstName(user.fullName),
@@ -89,7 +111,7 @@ class HomeScreen extends ConsumerWidget {
                   onAnalytics: () => context.go(AppRoutes.analytics),
                 ),
                 const SizedBox(height: AppDimens.spaceLg),
-                _buildAssignmentSection(context, ref, assignments),
+                _buildAssignmentSection(assignments),
                 const SizedBox(height: AppDimens.spaceLg),
                 const SectionHeader(
                   title: AppStrings.about,
@@ -133,15 +155,13 @@ class HomeScreen extends ConsumerWidget {
   }
 
   Widget _buildAssignmentSection(
-    BuildContext context,
-    WidgetRef ref,
     AsyncValue<List<Assignment>> assignments,
   ) {
     return assignments.when(
       data: (List<Assignment> list) {
-        final Assignment? pending = list.firstWhere(
+        final Assignment pending = list.firstWhere(
           (Assignment a) => a.status == AssignmentStatus.pending,
-          orElse: () => Assignment(
+          orElse: () => const Assignment(
             id: '',
             status: AssignmentStatus.pending,
           ),
@@ -160,11 +180,11 @@ class HomeScreen extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            if (pending != null && pending.id.isNotEmpty) ...<Widget>[
+            if (pending.id.isNotEmpty) ...<Widget>[
               FeaturedTestCard(
                 title: AppStrings.newTestReady,
                 subtitle: pending.testId?.title,
-                onStart: () => _startAssignment(context, ref, pending),
+                onStart: () => _startAssignment(pending),
               ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.05),
               const SizedBox(height: AppDimens.spaceMd),
             ],
@@ -174,7 +194,7 @@ class HomeScreen extends ConsumerWidget {
                 child: AssignmentSummaryCard(
                   assignment: a,
                   progressPercent: 50,
-                  onTap: () => _startAssignment(context, ref, a),
+                  onTap: () => _startAssignment(a),
                 ),
               ),
             ),
