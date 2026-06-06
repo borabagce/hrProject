@@ -3,7 +3,8 @@
     "allow": [
       "Bash(node --check src/controllers/analytics.controller.js)",
       "Bash(node --check src/routes/analytics.routes.js)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(node -e ' *)"
     ]
   }
 }

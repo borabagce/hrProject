@@ -166,6 +166,13 @@ const departmentLoading = ref(false);
 const departmentError = ref('');
 const departmentDeletingId = ref(null);
 
+// ─── Edit employee modal ──────────────────────────────────────────────────
+const showEditEmployeeModal = ref(false);
+const editEmployeeTarget = ref(null);
+const editEmployeeForm = ref({ fullName: '', role: 'employee', departmentId: '', isActive: true });
+const editEmployeeLoading = ref(false);
+const editEmployeeError = ref('');
+
 // ─── Computed ──────────────────────────────────────────────────────────────
 
 const employees = computed(() =>
@@ -261,9 +268,11 @@ const detailViewMode = ref('test');
 const detailSelectedTestId = ref('');
 const detailSelectedQuestionId = ref('');
 const detailSelectedDepartmentId = ref('');
+const detailSelectedEmployeeId = ref('');
 const detailTestData = ref(null);
 const detailQuestionData = ref(null);
 const detailDepartmentData = ref(null);
+const detailEmployeeData = ref(null);
 const detailLoading = ref(false);
 const detailError = ref('');
 
@@ -501,6 +510,23 @@ async function loadDepartmentDetail() {
   }
 }
 
+async function loadEmployeeDetail() {
+  if (!detailSelectedEmployeeId.value) {
+    detailEmployeeData.value = null;
+    return;
+  }
+  detailLoading.value = true;
+  detailError.value = '';
+  try {
+    detailEmployeeData.value = await analyticsStore.fetchEmployeeAnalytics(detailSelectedEmployeeId.value);
+  } catch (err) {
+    detailError.value = err.response?.data?.message ?? 'Personel analizi yüklenemedi.';
+    detailEmployeeData.value = null;
+  } finally {
+    detailLoading.value = false;
+  }
+}
+
 function setDetailMode(mode) {
   detailViewMode.value = mode;
   detailError.value = '';
@@ -717,6 +743,46 @@ async function deleteDepartment(dept) {
     alert(err.response?.data?.message ?? 'Departman silinemedi.');
   } finally {
     departmentDeletingId.value = null;
+  }
+}
+
+function openEditEmployeeModal(emp) {
+  const userObj = userStore.users.find((u) => u._id === emp.id);
+  if (!userObj) return;
+  editEmployeeTarget.value = emp;
+  editEmployeeForm.value = {
+    fullName: userObj.fullName,
+    role: userObj.role,
+    departmentId: userObj.departmentId?._id ?? userObj.departmentId ?? '',
+    isActive: userObj.isActive,
+  };
+  editEmployeeError.value = '';
+  showEditEmployeeModal.value = true;
+}
+
+async function submitEditEmployee() {
+  editEmployeeError.value = '';
+  if (!editEmployeeForm.value.fullName.trim()) {
+    editEmployeeError.value = 'Ad soyad zorunludur.';
+    return;
+  }
+  editEmployeeLoading.value = true;
+  try {
+    const payload = {
+      fullName: editEmployeeForm.value.fullName.trim(),
+      role: editEmployeeForm.value.role,
+      isActive: editEmployeeForm.value.isActive,
+    };
+    if (editEmployeeForm.value.departmentId) {
+      payload.departmentId = editEmployeeForm.value.departmentId;
+    }
+    await userStore.updateUser(editEmployeeTarget.value.id, payload);
+    await userStore.fetchUsers({ limit: 50 });
+    showEditEmployeeModal.value = false;
+  } catch (err) {
+    editEmployeeError.value = err.response?.data?.message ?? 'Personel güncellenemedi.';
+  } finally {
+    editEmployeeLoading.value = false;
   }
 }
 
@@ -1693,6 +1759,7 @@ onMounted(async () => {
               <div class="employee-actions">
                 <button type="button" @click="openAssignTestModal(emp)">Test ata</button>
                 <button type="button" @click="openEmployeeReport(emp)">Raporu gör</button>
+                <button type="button" @click="openEditEmployeeModal(emp)">Düzenle</button>
                 <button
                   type="button"
                   class="emp-toggle-btn emp-deactivate"
@@ -1729,6 +1796,7 @@ onMounted(async () => {
                 </div>
               </div>
               <div class="employee-actions">
+                <button type="button" @click="openEditEmployeeModal(emp)">Düzenle</button>
                 <button
                   type="button"
                   class="emp-toggle-btn emp-activate"
@@ -1743,172 +1811,6 @@ onMounted(async () => {
 
       <!-- ══════════════════════ ANALİZLER ══════════════════════ -->
       <template v-else-if="activeTab === 'Analizler'">
-
-        <!-- Overview Stats -->
-        <section v-if="overviewStats.totalSessions" class="analytics-overview-card card-surface">
-          <div class="section-title-row" style="margin-bottom:20px;">
-            <div><h2>Genel Bakış</h2><span></span></div>
-          </div>
-          <div class="analytics-stats-row">
-            <div class="stat-chip">
-              <strong>{{ overviewStats.totalSessions ?? 0 }}</strong>
-              <span>Toplam Oturum</span>
-            </div>
-            <div class="stat-chip">
-              <strong>%{{ overviewStats.avgScore?.toFixed(1) ?? '—' }}</strong>
-              <span>Ortalama Başarı</span>
-            </div>
-            <div class="stat-chip">
-              <strong>%{{ overviewStats.maxScore?.toFixed(1) ?? '—' }}</strong>
-              <span>En Yüksek</span>
-            </div>
-            <div class="stat-chip">
-              <strong>%{{ overviewStats.minScore?.toFixed(1) ?? '—' }}</strong>
-              <span>En Düşük</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- Top Wrong Questions -->
-        <section v-if="topWrongQuestions.length" class="section-block card-surface" style="padding:24px;border-radius:26px;">
-          <div class="section-title-row">
-            <div><h2>En Çok Yanlış Yapılan Sorular</h2><span></span></div>
-          </div>
-          <div class="wrong-questions-list">
-            <div
-              v-for="(q, i) in topWrongQuestions.slice(0, 5)"
-              :key="q._id ?? i"
-              class="wrong-question-row"
-            >
-              <span class="wq-rank">{{ i + 1 }}</span>
-              <span class="wq-text">{{ q.questionText }}</span>
-              <span class="wq-count">{{ q.wrongCount }} yanlış</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- Department Charts -->
-        <section class="section-block">
-          <div class="section-title-row">
-            <div><h2>Departman Analizleri</h2><span></span></div>
-          </div>
-          <div class="analytics-grid">
-            <article class="chart-card donut-card">
-              <div class="section-headline compact">
-                <h3>Departman Dağılımı</h3>
-              </div>
-              <div v-if="!departmentData.length" class="empty-state small"><p>Departman verisi yok</p></div>
-              <div v-else class="donut-wrap">
-                <svg viewBox="0 0 120 120" class="donut-svg">
-                  <circle cx="60" cy="60" r="50" class="donut-track"></circle>
-                  <circle
-                    v-for="(item, i) in departmentData"
-                    :key="item.name"
-                    cx="60" cy="60" r="50"
-                    class="donut-segment"
-                    :stroke="item.color"
-                    v-bind="donutStroke(item, i)"
-                  ></circle>
-                </svg>
-                <div class="donut-legend">
-                  <div v-for="item in departmentData" :key="item.name" class="legend-row">
-                    <span class="legend-dot" :style="{ background: item.color }"></span>
-                    <span>{{ item.name }}</span>
-                    <strong>%{{ item.value }}</strong>
-                  </div>
-                </div>
-              </div>
-            </article>
-
-            <article v-for="card in reportCards" :key="card.title" class="chart-card">
-              <div class="section-headline compact">
-                <h3>{{ card.title }}</h3>
-                <span class="chart-subtitle">{{ card.subtitle }}</span>
-              </div>
-              <div class="chart-panel">
-                <div class="bars">
-                  <span v-for="(bar, i) in card.bars" :key="i" class="bar" :style="{ height: barHeight(bar) }"></span>
-                </div>
-                <svg viewBox="0 0 260 130" class="line-chart" aria-hidden="true">
-                  <polyline :points="linePoints(card.line)" class="trend-line"></polyline>
-                </svg>
-                <div class="chart-dots">
-                  <span class="dot active"></span>
-                  <span class="dot"></span>
-                  <span class="dot muted"></span>
-                </div>
-              </div>
-            </article>
-          </div>
-        </section>
-
-        <!-- Report Generation -->
-        <section class="section-block card-surface" style="padding:28px;border-radius:26px;">
-          <div class="section-title-row" style="margin-bottom:24px;">
-            <div><h2>Rapor Oluştur</h2><span></span></div>
-          </div>
-          <div class="report-gen-form">
-            <div class="field-group">
-              <label class="field-label">Rapor Türü</label>
-              <select v-model="reportForm.reportType" class="field-select" style="max-width:360px;">
-                <option value="weekly_summary">Haftalık Özet</option>
-                <option value="monthly_summary">Aylık Özet</option>
-                <option value="risk_assessment">Risk Değerlendirmesi</option>
-              </select>
-            </div>
-            <div class="field-row-2" style="max-width:480px;">
-              <div class="field-group">
-                <label class="field-label">Dönem Başlangıcı</label>
-                <input v-model="reportForm.periodStart" class="field-input" type="date" />
-              </div>
-              <div class="field-group">
-                <label class="field-label">Dönem Bitişi</label>
-                <input v-model="reportForm.periodEnd" class="field-input" type="date" />
-              </div>
-            </div>
-            <p v-if="reportError" class="form-error" style="margin-top:4px;">{{ reportError }}</p>
-            <div class="step-actions" style="justify-content:flex-start;">
-              <button
-                class="primary-btn"
-                type="button"
-                :disabled="reportGenerating"
-                @click="submitGenerateReport"
-              >
-                {{ reportGenerating ? 'Oluşturuluyor…' : 'Rapor Oluştur' }}
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <!-- Reports List -->
-        <section v-if="analyticsStore.reports.length" class="section-block card-surface" style="padding:28px;border-radius:26px;">
-          <div class="section-title-row" style="margin-bottom:20px;">
-            <div><h2>Oluşturulan Raporlar</h2><span></span></div>
-          </div>
-          <div class="reports-list">
-            <div
-              v-for="report in analyticsStore.reports"
-              :key="report._id"
-              class="report-list-row clickable"
-              @click="openReportDetail(report)"
-            >
-              <span class="report-type-chip">{{ REPORT_TYPE_LABELS[report.reportType] }}</span>
-              <div class="report-list-meta">
-                <strong>
-                  {{ new Date(report.periodStart).toLocaleDateString('tr-TR') }} —
-                  {{ new Date(report.periodEnd).toLocaleDateString('tr-TR') }}
-                </strong>
-                <p>
-                  Ort. Başarı: %{{ report.avgScore?.toFixed(1) ?? '—' }}
-                  · Oluşturan: {{ report.generatedBy?.fullName ?? '—' }}
-                </p>
-              </div>
-              <span class="risk-badge" :class="`risk-${report.riskLevel}`">
-                {{ RISK_LABELS[report.riskLevel] ?? report.riskLevel }}
-              </span>
-            </div>
-          </div>
-        </section>
 
         <!-- Detailed Analytics -->
         <section class="section-block detail-analytics-card card-surface">
@@ -1935,6 +1837,12 @@ onMounted(async () => {
               type="button"
               @click="setDetailMode('department')"
             >Departman Bazlı</button>
+            <button
+              class="subview-tab"
+              :class="{ active: detailViewMode === 'employee' }"
+              type="button"
+              @click="setDetailMode('employee')"
+            >Personel Bazlı</button>
           </div>
 
           <!-- Test detail -->
@@ -2227,6 +2135,259 @@ onMounted(async () => {
             </template>
             <div v-else class="empty-state small"><p>Detayları görmek için bir departman seçin.</p></div>
           </template>
+
+          <!-- Employee detail -->
+          <template v-else-if="detailViewMode === 'employee'">
+            <div class="detail-selector-row">
+              <div class="field-group">
+                <label class="field-label">Personel Seçin</label>
+                <select v-model="detailSelectedEmployeeId" class="field-select" @change="loadEmployeeDetail">
+                  <option value="">Personel seçin…</option>
+                  <option v-for="emp in employees" :key="emp.id" :value="emp.id">
+                    {{ emp.name }} — {{ emp.dept }}
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            <div v-if="detailLoading" style="text-align:center;padding:24px;">
+              <div class="spinner" style="width:32px;height:32px;margin:0 auto;"></div>
+            </div>
+            <p v-else-if="detailError" class="form-error">{{ detailError }}</p>
+            <template v-else-if="detailEmployeeData">
+              <div class="assign-target-chip" style="margin-bottom:16px;">
+                <div>
+                  <strong>{{ detailEmployeeData.user?.fullName }}</strong>
+                  <p>{{ detailEmployeeData.user?.email }}</p>
+                </div>
+              </div>
+
+              <div class="detail-stats-grid">
+                <div class="detail-stat-tile">
+                  <span>Tamamlanan Test</span>
+                  <strong>{{ detailEmployeeData.sessionHistory?.length ?? 0 }}</strong>
+                </div>
+                <div class="detail-stat-tile">
+                  <span>Ort. Skor</span>
+                  <strong>
+                    %{{
+                      detailEmployeeData.sessionHistory?.length
+                        ? (detailEmployeeData.sessionHistory.reduce((s, x) => s + (x.scorePercent ?? 0), 0) /
+                           detailEmployeeData.sessionHistory.length).toFixed(1)
+                        : '—'
+                    }}
+                  </strong>
+                </div>
+                <div class="detail-stat-tile">
+                  <span>Takipteki Soru</span>
+                  <strong>{{ detailEmployeeData.knowledgeStats?.totalTracked ?? 0 }}</strong>
+                </div>
+                <div class="detail-stat-tile">
+                  <span>Tekrar Bekleyen</span>
+                  <strong>{{ detailEmployeeData.knowledgeStats?.dueCount ?? 0 }}</strong>
+                </div>
+              </div>
+
+              <p class="detail-subhead">Test Geçmişi</p>
+              <div class="detail-table-wrap">
+                <table class="detail-table">
+                  <thead>
+                    <tr>
+                      <th>Hafta</th>
+                      <th>Tür</th>
+                      <th>Doğru</th>
+                      <th>Skor</th>
+                      <th>Tarih</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(s, i) in detailEmployeeData.sessionHistory" :key="i">
+                      <td><strong>W{{ s.weekNumber }}/{{ s.year }}</strong></td>
+                      <td>{{ s.sessionType === 'review' ? 'Tekrar' : 'Haftalık' }}</td>
+                      <td>{{ s.correctCount }}/{{ s.totalQuestions }}</td>
+                      <td><span :class="scoreClass(s.scorePercent)">%{{ s.scorePercent }}</span></td>
+                      <td>{{ s.completedAt ? new Date(s.completedAt).toLocaleDateString('tr-TR') : '—' }}</td>
+                    </tr>
+                    <tr v-if="!detailEmployeeData.sessionHistory?.length">
+                      <td colspan="5" style="text-align:center;color:var(--muted);">Henüz tamamlanmış test oturumu yok.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <p class="detail-subhead">Kategori Bazlı Hata Oranı</p>
+              <div class="detail-table-wrap">
+                <table class="detail-table">
+                  <thead>
+                    <tr>
+                      <th>Kategori</th>
+                      <th>Toplam</th>
+                      <th>Yanlış</th>
+                      <th>Hata Oranı</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(c, i) in detailEmployeeData.wrongByCategory" :key="i">
+                      <td><strong>{{ c.categoryName }}</strong></td>
+                      <td>{{ c.total }}</td>
+                      <td>{{ c.wrong }}</td>
+                      <td>
+                        <span :class="scoreClass(100 - (c.errorRate ?? 0))">%{{ (c.errorRate ?? 0).toFixed(1) }}</span>
+                      </td>
+                    </tr>
+                    <tr v-if="!detailEmployeeData.wrongByCategory?.length">
+                      <td colspan="4" style="text-align:center;color:var(--muted);">Veri yok.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <p class="detail-subhead">Haftalık Trend</p>
+              <div class="detail-table-wrap">
+                <table class="detail-table">
+                  <thead>
+                    <tr>
+                      <th>Dönem</th>
+                      <th>Skor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(t, i) in detailEmployeeData.weeklyTrend" :key="i">
+                      <td><strong>{{ t.label }}</strong></td>
+                      <td><span :class="scoreClass(t.score)">%{{ t.score }}</span></td>
+                    </tr>
+                    <tr v-if="!detailEmployeeData.weeklyTrend?.length">
+                      <td colspan="2" style="text-align:center;color:var(--muted);">Veri yok.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </template>
+            <div v-else class="empty-state small"><p>Detayları görmek için bir personel seçin.</p></div>
+          </template>
+        </section>
+
+        <!-- Department Charts -->
+        <section class="section-block">
+          <div class="section-title-row">
+            <div><h2>Departman Analizleri</h2><span></span></div>
+          </div>
+          <div class="analytics-grid">
+            <article class="chart-card donut-card">
+              <div class="section-headline compact">
+                <h3>Departman Dağılımı</h3>
+              </div>
+              <div v-if="!departmentData.length" class="empty-state small"><p>Departman verisi yok</p></div>
+              <div v-else class="donut-wrap">
+                <svg viewBox="0 0 120 120" class="donut-svg">
+                  <circle cx="60" cy="60" r="50" class="donut-track"></circle>
+                  <circle
+                    v-for="(item, i) in departmentData"
+                    :key="item.name"
+                    cx="60" cy="60" r="50"
+                    class="donut-segment"
+                    :stroke="item.color"
+                    v-bind="donutStroke(item, i)"
+                  ></circle>
+                </svg>
+                <div class="donut-legend">
+                  <div v-for="item in departmentData" :key="item.name" class="legend-row">
+                    <span class="legend-dot" :style="{ background: item.color }"></span>
+                    <span>{{ item.name }}</span>
+                    <strong>%{{ item.value }}</strong>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article v-for="card in reportCards" :key="card.title" class="chart-card">
+              <div class="section-headline compact">
+                <h3>{{ card.title }}</h3>
+                <span class="chart-subtitle">{{ card.subtitle }}</span>
+              </div>
+              <div class="chart-panel">
+                <div class="bars">
+                  <span v-for="(bar, i) in card.bars" :key="i" class="bar" :style="{ height: barHeight(bar) }"></span>
+                </div>
+                <svg viewBox="0 0 260 130" class="line-chart" aria-hidden="true">
+                  <polyline :points="linePoints(card.line)" class="trend-line"></polyline>
+                </svg>
+                <div class="chart-dots">
+                  <span class="dot active"></span>
+                  <span class="dot"></span>
+                  <span class="dot muted"></span>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- Report Generation -->
+        <section class="section-block card-surface" style="padding:28px;border-radius:26px;">
+          <div class="section-title-row" style="margin-bottom:24px;">
+            <div><h2>Rapor Oluştur</h2><span></span></div>
+          </div>
+          <div class="report-gen-form">
+            <div class="field-group">
+              <label class="field-label">Rapor Türü</label>
+              <select v-model="reportForm.reportType" class="field-select" style="max-width:360px;">
+                <option value="weekly_summary">Haftalık Özet</option>
+                <option value="monthly_summary">Aylık Özet</option>
+                <option value="risk_assessment">Risk Değerlendirmesi</option>
+              </select>
+            </div>
+            <div class="field-row-2" style="max-width:480px;">
+              <div class="field-group">
+                <label class="field-label">Dönem Başlangıcı</label>
+                <input v-model="reportForm.periodStart" class="field-input" type="date" />
+              </div>
+              <div class="field-group">
+                <label class="field-label">Dönem Bitişi</label>
+                <input v-model="reportForm.periodEnd" class="field-input" type="date" />
+              </div>
+            </div>
+            <p v-if="reportError" class="form-error" style="margin-top:4px;">{{ reportError }}</p>
+            <div class="step-actions" style="justify-content:flex-start;">
+              <button
+                class="primary-btn"
+                type="button"
+                :disabled="reportGenerating"
+                @click="submitGenerateReport"
+              >
+                {{ reportGenerating ? 'Oluşturuluyor…' : 'Rapor Oluştur' }}
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Reports List -->
+        <section v-if="analyticsStore.reports.length" class="section-block card-surface" style="padding:28px;border-radius:26px;">
+          <div class="section-title-row" style="margin-bottom:20px;">
+            <div><h2>Oluşturulan Raporlar</h2><span></span></div>
+          </div>
+          <div class="reports-list">
+            <div
+              v-for="report in analyticsStore.reports"
+              :key="report._id"
+              class="report-list-row clickable"
+              @click="openReportDetail(report)"
+            >
+              <span class="report-type-chip">{{ REPORT_TYPE_LABELS[report.reportType] }}</span>
+              <div class="report-list-meta">
+                <strong>
+                  {{ new Date(report.periodStart).toLocaleDateString('tr-TR') }} —
+                  {{ new Date(report.periodEnd).toLocaleDateString('tr-TR') }}
+                </strong>
+                <p>
+                  Ort. Başarı: %{{ report.avgScore?.toFixed(1) ?? '—' }}
+                  · Oluşturan: {{ report.generatedBy?.fullName ?? '—' }}
+                </p>
+              </div>
+              <span class="risk-badge" :class="`risk-${report.riskLevel}`">
+                {{ RISK_LABELS[report.riskLevel] ?? report.riskLevel }}
+              </span>
+            </div>
+          </div>
         </section>
 
       </template>
@@ -2367,6 +2528,65 @@ onMounted(async () => {
             <button class="secondary-btn" type="button" @click="showAddEmployeeModal = false">İptal</button>
             <button class="primary-btn" type="submit" :disabled="addEmployeeLoading">
               {{ addEmployeeLoading ? 'Ekleniyor…' : 'Personel Ekle' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ══════════════════════ EDIT EMPLOYEE MODAL ══════════════════════ -->
+    <div v-if="showEditEmployeeModal" class="modal-overlay" @click.self="showEditEmployeeModal = false">
+      <div class="modal-card card-surface">
+        <div class="modal-header">
+          <h2>Personeli Düzenle</h2>
+          <button class="modal-close" type="button" @click="showEditEmployeeModal = false">✕</button>
+        </div>
+        <form @submit.prevent="submitEditEmployee">
+          <div class="step-fields">
+            <div class="field-group">
+              <label class="field-label">Ad Soyad *</label>
+              <input
+                v-model="editEmployeeForm.fullName"
+                class="field-input"
+                type="text"
+                maxlength="100"
+                required
+              />
+            </div>
+            <div class="field-row-2">
+              <div class="field-group">
+                <label class="field-label">Departman</label>
+                <select v-model="editEmployeeForm.departmentId" class="field-select">
+                  <option value="">Departman yok</option>
+                  <option
+                    v-for="dept in departmentStore.departments"
+                    :key="dept._id"
+                    :value="dept._id"
+                  >{{ dept.name }}</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Rol</label>
+                <select v-model="editEmployeeForm.role" class="field-select">
+                  <option value="employee">Personel</option>
+                  <option value="manager">Yönetici (Departman)</option>
+                  <option value="hr">İK Direktörü</option>
+                  <option value="admin">Yönetici</option>
+                </select>
+              </div>
+            </div>
+            <div class="field-group">
+              <label class="field-label" style="display:flex;align-items:center;gap:10px;">
+                <input type="checkbox" v-model="editEmployeeForm.isActive" />
+                Aktif
+              </label>
+            </div>
+          </div>
+          <p v-if="editEmployeeError" class="form-error" style="margin-top:12px;">{{ editEmployeeError }}</p>
+          <div class="modal-actions">
+            <button class="secondary-btn" type="button" @click="showEditEmployeeModal = false">İptal</button>
+            <button class="primary-btn" type="submit" :disabled="editEmployeeLoading">
+              {{ editEmployeeLoading ? 'Kaydediliyor…' : 'Kaydet' }}
             </button>
           </div>
         </form>
