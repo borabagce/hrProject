@@ -2628,6 +2628,55 @@ a {
   background: rgba(233, 30, 140, 0.14);
 }
 
+.dept-bulk-select {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(46, 125, 122, 0.04);
+  border: 1px solid rgba(46, 125, 122, 0.1);
+}
+
+.dept-bulk-label {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.dept-bulk-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dept-bulk-chip {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(46, 125, 122, 0.25);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--teal);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.dept-bulk-chip:hover {
+  background: rgba(46, 125, 122, 0.1);
+}
+
+.dept-bulk-chip-active {
+  background: var(--teal);
+  color: #fff;
+  border-color: var(--teal);
+}
+
+.dept-bulk-chip-active:hover {
+  background: var(--teal);
+}
+
 .report-list-row.clickable {
   cursor: pointer;
   transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;

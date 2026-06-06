@@ -913,6 +913,45 @@ function isPickerQuestionAdded(id) {
   return selectedQuestionIds.value.includes(id);
 }
 
+// ─── Department-based bulk employee select ─────────────────────────────────
+function activeUsersInDept(deptId) {
+  return userStore.users.filter(
+    (u) => u.isActive && (u.departmentId?._id ?? u.departmentId) === deptId
+  );
+}
+
+function isDeptFullySelected(deptId, selectionList) {
+  const ids = activeUsersInDept(deptId).map((u) => u._id);
+  if (!ids.length) return false;
+  return ids.every((id) => selectionList.includes(id));
+}
+
+function toggleDeptSelectionInWizard(deptId) {
+  const ids = activeUsersInDept(deptId).map((u) => u._id);
+  if (!ids.length) return;
+  const allSelected = ids.every((id) => selectedEmployeeIds.value.includes(id));
+  if (allSelected) {
+    selectedEmployeeIds.value = selectedEmployeeIds.value.filter((id) => !ids.includes(id));
+  } else {
+    selectedEmployeeIds.value = [...new Set([...selectedEmployeeIds.value, ...ids])];
+  }
+}
+
+function toggleDeptSelectionInSavedTest(deptId) {
+  const ids = activeUsersInDept(deptId).map((u) => u._id);
+  if (!ids.length) return;
+  const assignable = ids.filter((id) => !savedTestAlreadyAssignedIds.value.includes(id));
+  if (!assignable.length) return;
+  const allSelected = assignable.every((id) => savedTestAssignEmployeeIds.value.includes(id));
+  if (allSelected) {
+    savedTestAssignEmployeeIds.value = savedTestAssignEmployeeIds.value.filter(
+      (id) => !assignable.includes(id)
+    );
+  } else {
+    savedTestAssignEmployeeIds.value = [...new Set([...savedTestAssignEmployeeIds.value, ...assignable])];
+  }
+}
+
 // ─── Auth ──────────────────────────────────────────────────────────────────
 
 async function logout() {
@@ -1597,6 +1636,23 @@ onMounted(async () => {
           <section v-else-if="wizardStep === 3" class="step-form card-surface">
             <h2>Personel Atama ve Yayınlama</h2>
             <p class="section-text">Testi atamak istediğiniz personelleri seçin.</p>
+
+            <div v-if="departmentStore.departments.length" class="dept-bulk-select">
+              <p class="dept-bulk-label">Departman bazlı toplu seçim:</p>
+              <div class="dept-bulk-chips">
+                <button
+                  v-for="dept in departmentStore.departments"
+                  :key="dept._id"
+                  class="dept-bulk-chip"
+                  :class="{ 'dept-bulk-chip-active': isDeptFullySelected(dept._id, selectedEmployeeIds) }"
+                  type="button"
+                  @click="toggleDeptSelectionInWizard(dept._id)"
+                >
+                  {{ dept.name }} ({{ activeUsersInDept(dept._id).length }})
+                </button>
+              </div>
+            </div>
+
             <div class="employee-select-grid">
               <label
                 v-for="emp in employees"
@@ -2612,6 +2668,23 @@ onMounted(async () => {
         <p v-if="savedTestAssignError" class="assign-feedback assign-feedback-error">{{ savedTestAssignError }}</p>
 
         <p class="field-label" style="margin-bottom:10px;">Atanacak personelleri seçin:</p>
+
+        <div v-if="departmentStore.departments.length" class="dept-bulk-select" style="margin-bottom:14px;">
+          <p class="dept-bulk-label">Departman bazlı toplu seçim:</p>
+          <div class="dept-bulk-chips">
+            <button
+              v-for="dept in departmentStore.departments"
+              :key="dept._id"
+              class="dept-bulk-chip"
+              :class="{ 'dept-bulk-chip-active': isDeptFullySelected(dept._id, savedTestAssignEmployeeIds) }"
+              type="button"
+              @click="toggleDeptSelectionInSavedTest(dept._id)"
+            >
+              {{ dept.name }} ({{ activeUsersInDept(dept._id).length }})
+            </button>
+          </div>
+        </div>
+
         <div class="employee-select-grid" style="max-height:340px;overflow-y:auto;">
           <label
             v-for="emp in employees.filter(e => e.isActive)"

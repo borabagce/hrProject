@@ -330,49 +330,83 @@ export const getDepartmentAnalytics = async (req, res, next) => {
   try {
     const companyId = new mongoose.Types.ObjectId(req.user.companyId);
 
-    const stats = await TestSession.aggregate([
-      { $match: { companyId, isCompleted: true } },
+    const departmentRows = await Department.aggregate([
+      { $match: { companyId } },
       {
         $lookup: {
           from: 'users',
-          localField: 'userId',
-          foreignField: '_id',
-          as: 'user',
+          let: { deptId: '$_id' },
+          pipeline: [
+            { $match: { $expr: { $and: [
+              { $eq: ['$departmentId', '$$deptId'] },
+              { $eq: ['$companyId', companyId] },
+              { $eq: ['$isActive', true] },
+            ] } } },
+            { $project: { _id: 1 } },
+          ],
+          as: 'users',
         },
-      },
-      { $unwind: '$user' },
-      {
-        $group: {
-          _id: '$user.departmentId',
-          avgScore: { $avg: '$scorePercent' },
-          totalSessions: { $sum: 1 },
-          employeeCount: { $addToSet: '$userId' },
-        },
-      },
-      {
-        $addFields: { employeeCount: { $size: '$employeeCount' } },
       },
       {
         $lookup: {
-          from: 'departments',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'department',
+          from: 'testsessions',
+          let: { userIds: '$users._id' },
+          pipeline: [
+            { $match: { $expr: { $and: [
+              { $in: ['$userId', '$$userIds'] },
+              { $eq: ['$isCompleted', true] },
+            ] } } },
+            { $project: { scorePercent: 1 } },
+          ],
+          as: 'sessions',
         },
       },
-      { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
       {
         $project: {
-          departmentName: { $ifNull: ['$department.name', 'No Department'] },
-          avgScore: { $round: ['$avgScore', 1] },
-          totalSessions: 1,
-          employeeCount: 1,
+          _id: 1,
+          departmentName: '$name',
+          employeeCount: { $size: '$users' },
+          totalSessions: { $size: '$sessions' },
+          avgScore: {
+            $cond: [
+              { $eq: [{ $size: '$sessions' }, 0] },
+              0,
+              { $round: [{ $avg: '$sessions.scorePercent' }, 1] },
+            ],
+          },
         },
       },
-      { $sort: { avgScore: -1 } },
+      { $sort: { avgScore: -1, departmentName: 1 } },
     ]);
 
-    res.json({ success: true, data: stats });
+    const unassignedUsers = await User.aggregate([
+      { $match: { companyId, departmentId: null, isActive: true } },
+      { $project: { _id: 1 } },
+    ]);
+
+    if (unassignedUsers.length) {
+      const unassignedUserIds = unassignedUsers.map((u) => u._id);
+      const unassignedSessions = await TestSession.aggregate([
+        { $match: { userId: { $in: unassignedUserIds }, isCompleted: true } },
+        {
+          $group: {
+            _id: null,
+            totalSessions: { $sum: 1 },
+            avgScore: { $avg: '$scorePercent' },
+          },
+        },
+      ]);
+      const row = unassignedSessions[0] ?? { totalSessions: 0, avgScore: 0 };
+      departmentRows.push({
+        _id: null,
+        departmentName: 'Departmansız',
+        employeeCount: unassignedUsers.length,
+        totalSessions: row.totalSessions,
+        avgScore: row.totalSessions ? Math.round(row.avgScore * 10) / 10 : 0,
+      });
+    }
+
+    res.json({ success: true, data: departmentRows });
   } catch (err) {
     next(err);
   }
@@ -474,7 +508,7 @@ export const generateReport = async (req, res, next) => {
         { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
         {
           $project: {
-            departmentName: { $ifNull: ['$department.name', 'No Department'] },
+            departmentName: { $ifNull: ['$department.name', 'Departmansız'] },
             avgScore: { $round: ['$avgScore', 1] },
             sessionCount: 1,
           },
