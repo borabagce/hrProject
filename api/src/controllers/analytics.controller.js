@@ -4,6 +4,10 @@ import { TestSession } from '../models/TestSession.js';
 import { User } from '../models/User.js';
 import { UserKnowledgeProfile } from '../models/UserKnowledgeProfile.js';
 import { HrReport } from '../models/HrReport.js';
+import { Test } from '../models/Test.js';
+import { TestAssignment } from '../models/TestAssignment.js';
+import { Question } from '../models/Question.js';
+import { Department } from '../models/Department.js';
 import { ApiError } from '../utils/ApiError.js';
 import { effectiveMemoryStrengthExpr } from '../services/sm2.js';
 
@@ -534,6 +538,335 @@ export const listReports = async (req, res, next) => {
       .limit(50);
 
     res.json({ success: true, data: reports });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getTestAnalytics = async (req, res, next) => {
+  try {
+    const testId = new mongoose.Types.ObjectId(req.params.testId);
+    const companyId = new mongoose.Types.ObjectId(req.user.companyId);
+
+    const test = await Test.findOne({ _id: testId, companyId }).select('title type difficulty questionIds categoryId');
+    if (!test) throw ApiError.notFound('Test not found');
+
+    const assignments = await TestAssignment.aggregate([
+      { $match: { testId, companyId } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'assignedTo',
+          foreignField: '_id',
+          as: 'user',
+        },
+      },
+      { $unwind: '$user' },
+      {
+        $lookup: {
+          from: 'departments',
+          localField: 'user.departmentId',
+          foreignField: '_id',
+          as: 'department',
+        },
+      },
+      { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'testsessions',
+          localField: 'sessionId',
+          foreignField: '_id',
+          as: 'session',
+        },
+      },
+      { $unwind: { path: '$session', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          userId: '$user._id',
+          fullName: '$user.fullName',
+          departmentName: '$department.name',
+          departmentId: '$user.departmentId',
+          status: 1,
+          completedAt: 1,
+          scorePercent: '$session.scorePercent',
+          correctCount: '$session.correctCount',
+          totalQuestions: '$session.totalQuestions',
+          isCompleted: '$session.isCompleted',
+        },
+      },
+    ]);
+
+    const completed = assignments.filter((a) => a.isCompleted);
+    const scores = completed.map((a) => a.scorePercent ?? 0);
+    const summary = {
+      assignedCount: assignments.length,
+      completedCount: completed.length,
+      avgScore: scores.length ? scores.reduce((s, v) => s + v, 0) / scores.length : 0,
+      maxScore: scores.length ? Math.max(...scores) : 0,
+      minScore: scores.length ? Math.min(...scores) : 0,
+    };
+
+    const sessionIds = await TestAssignment.find({
+      testId,
+      companyId,
+      sessionId: { $ne: null },
+    }).distinct('sessionId');
+
+    const questionStats = await UserAnswer.aggregate([
+      {
+        $match: {
+          companyId,
+          questionId: { $in: test.questionIds },
+          sessionId: { $in: sessionIds },
+        },
+      },
+      {
+        $group: {
+          _id: '$questionId',
+          totalAttempts: { $sum: 1 },
+          wrongCount: { $sum: { $cond: [{ $eq: ['$isCorrect', false] }, 1, 0] } },
+        },
+      },
+      {
+        $lookup: {
+          from: 'questions',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'question',
+        },
+      },
+      { $unwind: '$question' },
+      {
+        $project: {
+          questionId: '$_id',
+          _id: 0,
+          text: '$question.text',
+          totalAttempts: 1,
+          wrongCount: 1,
+          errorRate: {
+            $round: [{ $multiply: [{ $divide: ['$wrongCount', '$totalAttempts'] }, 100] }, 1],
+          },
+        },
+      },
+      { $sort: { errorRate: -1 } },
+    ]);
+
+    const deptMap = new Map();
+    for (const a of completed) {
+      const key = a.departmentName ?? 'Departmansız';
+      if (!deptMap.has(key)) deptMap.set(key, { completedCount: 0, total: 0 });
+      const d = deptMap.get(key);
+      d.completedCount += 1;
+      d.total += a.scorePercent ?? 0;
+    }
+    const departmentBreakdown = Array.from(deptMap.entries()).map(([departmentName, v]) => ({
+      departmentName,
+      completedCount: v.completedCount,
+      avgScore: v.completedCount ? v.total / v.completedCount : 0,
+    })).sort((a, b) => b.avgScore - a.avgScore);
+
+    res.json({
+      success: true,
+      data: {
+        test: {
+          _id: test._id,
+          title: test.title,
+          type: test.type,
+          difficulty: test.difficulty,
+          totalQuestions: test.questionIds.length,
+        },
+        summary,
+        userPerformance: assignments,
+        questionStats,
+        departmentBreakdown,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getQuestionDetail = async (req, res, next) => {
+  try {
+    const questionId = new mongoose.Types.ObjectId(req.params.questionId);
+    const companyId = new mongoose.Types.ObjectId(req.user.companyId);
+
+    const question = await Question.findOne({ _id: questionId, companyId }).select('text type difficulty options categoryId');
+    if (!question) throw ApiError.notFound('Question not found');
+
+    const [summaryRow] = await UserAnswer.aggregate([
+      { $match: { companyId, questionId } },
+      {
+        $group: {
+          _id: null,
+          totalAttempts: { $sum: 1 },
+          wrongCount: { $sum: { $cond: [{ $eq: ['$isCorrect', false] }, 1, 0] } },
+          avgResponseTime: { $avg: '$responseTimeSec' },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          totalAttempts: 1,
+          wrongCount: 1,
+          avgResponseTime: { $ifNull: ['$avgResponseTime', 0] },
+          errorRate: {
+            $cond: [
+              { $eq: ['$totalAttempts', 0] },
+              0,
+              { $multiply: [{ $divide: ['$wrongCount', '$totalAttempts'] }, 100] },
+            ],
+          },
+        },
+      },
+    ]);
+
+    const wrongAnswers = await UserAnswer.aggregate([
+      { $match: { companyId, questionId, isCorrect: false } },
+      { $sort: { answeredAt: -1 } },
+      { $limit: 100 },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user',
+        },
+      },
+      { $unwind: '$user' },
+      {
+        $lookup: {
+          from: 'departments',
+          localField: 'user.departmentId',
+          foreignField: '_id',
+          as: 'department',
+        },
+      },
+      { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 0,
+          userId: '$user._id',
+          fullName: '$user.fullName',
+          departmentName: '$department.name',
+          selectedOptionOrder: 1,
+          responseTimeSec: 1,
+          answeredAt: 1,
+        },
+      },
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        question,
+        summary: summaryRow ?? { totalAttempts: 0, wrongCount: 0, avgResponseTime: 0, errorRate: 0 },
+        wrongAnswers,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getDepartmentDetail = async (req, res, next) => {
+  try {
+    const departmentId = new mongoose.Types.ObjectId(req.params.departmentId);
+    const companyId = new mongoose.Types.ObjectId(req.user.companyId);
+
+    const department = await Department.findOne({ _id: departmentId, companyId });
+    if (!department) throw ApiError.notFound('Department not found');
+
+    const [employeeCount, sessions] = await Promise.all([
+      User.countDocuments({ companyId, departmentId, isActive: true }),
+      TestAssignment.aggregate([
+        { $match: { companyId } },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'assignedTo',
+            foreignField: '_id',
+            as: 'user',
+          },
+        },
+        { $unwind: '$user' },
+        { $match: { 'user.departmentId': departmentId } },
+        {
+          $lookup: {
+            from: 'testsessions',
+            localField: 'sessionId',
+            foreignField: '_id',
+            as: 'session',
+          },
+        },
+        { $unwind: { path: '$session', preserveNullAndEmptyArrays: true } },
+        { $match: { 'session.isCompleted': true } },
+        {
+          $lookup: {
+            from: 'tests',
+            localField: 'testId',
+            foreignField: '_id',
+            as: 'test',
+          },
+        },
+        { $unwind: '$test' },
+        {
+          $project: {
+            _id: 0,
+            userId: '$user._id',
+            fullName: '$user.fullName',
+            testId: '$test._id',
+            testTitle: '$test.title',
+            scorePercent: '$session.scorePercent',
+          },
+        },
+      ]),
+    ]);
+
+    const scores = sessions.map((s) => s.scorePercent ?? 0);
+    const summary = {
+      employeeCount,
+      totalSessions: sessions.length,
+      avgScore: scores.length ? scores.reduce((s, v) => s + v, 0) / scores.length : 0,
+    };
+
+    const testMap = new Map();
+    for (const s of sessions) {
+      const key = s.testId.toString();
+      if (!testMap.has(key)) testMap.set(key, { testId: s.testId, title: s.testTitle, scores: [] });
+      testMap.get(key).scores.push(s.scorePercent ?? 0);
+    }
+    const testBreakdown = Array.from(testMap.values()).map((t) => ({
+      testId: t.testId,
+      title: t.title,
+      completedCount: t.scores.length,
+      avgScore: t.scores.reduce((s, v) => s + v, 0) / t.scores.length,
+      maxScore: Math.max(...t.scores),
+      minScore: Math.min(...t.scores),
+    })).sort((a, b) => b.avgScore - a.avgScore);
+
+    const userMap = new Map();
+    for (const s of sessions) {
+      const key = s.userId.toString();
+      if (!userMap.has(key)) userMap.set(key, { userId: s.userId, fullName: s.fullName, scores: [] });
+      userMap.get(key).scores.push(s.scorePercent ?? 0);
+    }
+    const userBreakdown = Array.from(userMap.values()).map((u) => ({
+      userId: u.userId,
+      fullName: u.fullName,
+      completedCount: u.scores.length,
+      avgScore: u.scores.reduce((s, v) => s + v, 0) / u.scores.length,
+    })).sort((a, b) => b.avgScore - a.avgScore);
+
+    res.json({
+      success: true,
+      data: {
+        department: { _id: department._id, name: department.name },
+        summary,
+        testBreakdown,
+        userBreakdown,
+      },
+    });
   } catch (err) {
     next(err);
   }

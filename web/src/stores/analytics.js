@@ -39,9 +39,30 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     reports.value = data.data;
   }
 
+  async function fetchReport(id) {
+    const { data } = await api.get(`/api/analytics/reports/${id}`);
+    return data.data;
+  }
+
+  async function fetchTestAnalytics(testId) {
+    const { data } = await api.get(`/api/analytics/tests/${testId}`);
+    return data.data;
+  }
+
+  async function fetchQuestionDetail(questionId) {
+    const { data } = await api.get(`/api/analytics/questions/${questionId}`);
+    return data.data;
+  }
+
+  async function fetchDepartmentDetail(departmentId) {
+    const { data } = await api.get(`/api/analytics/departments/${departmentId}`);
+    return data.data;
+  }
+
   return {
     overview, departments, questionStats, reports,
     fetchOverview, fetchDepartments, fetchQuestionAnalytics,
     fetchEmployeeAnalytics, generateReport, listReports,
+    fetchReport, fetchTestAnalytics, fetchQuestionDetail, fetchDepartmentDetail,
   };
 });

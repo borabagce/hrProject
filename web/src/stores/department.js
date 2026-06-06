@@ -6,7 +6,7 @@ export const useDepartmentStore = defineStore('department', () => {
   const departments = ref([]);
 
   async function fetchDepartments() {
-    const { data } = await api.get('/api/departments');
+    const { data } = await api.get('/api/departments', { params: { limit: 100 } });
     departments.value = data.data;
   }
 

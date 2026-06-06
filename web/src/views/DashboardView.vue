@@ -158,6 +158,14 @@ function defaultEmployee() {
   return { fullName: '', email: '', password: '', role: 'employee', departmentId: '' };
 }
 
+// ─── Department management ─────────────────────────────────────────────────
+const showDepartmentModal = ref(false);
+const departmentModalMode = ref('create');
+const departmentForm = ref({ id: null, name: '', managerId: '' });
+const departmentLoading = ref(false);
+const departmentError = ref('');
+const departmentDeletingId = ref(null);
+
 // ─── Computed ──────────────────────────────────────────────────────────────
 
 const employees = computed(() =>
@@ -242,6 +250,22 @@ const RISK_LABELS = { low: 'Düşük', medium: 'Orta', high: 'Yüksek' };
 const reportGenerating = ref(false);
 const reportError = ref('');
 const reportForm = ref({ reportType: 'weekly_summary', periodStart: '', periodEnd: '' });
+
+const showReportDetailModal = ref(false);
+const reportDetail = ref(null);
+const reportDetailLoading = ref(false);
+const reportDetailError = ref('');
+
+// ─── Detailed analytics state ──────────────────────────────────────────────
+const detailViewMode = ref('test');
+const detailSelectedTestId = ref('');
+const detailSelectedQuestionId = ref('');
+const detailSelectedDepartmentId = ref('');
+const detailTestData = ref(null);
+const detailQuestionData = ref(null);
+const detailDepartmentData = ref(null);
+const detailLoading = ref(false);
+const detailError = ref('');
 
 const selectedCategoryName = computed(() => {
   if (!testCategoryId.value) return '—';
@@ -405,6 +429,83 @@ function startFreshTestForEmployee() {
   }
 }
 
+async function openReportDetail(report) {
+  reportDetail.value = null;
+  reportDetailError.value = '';
+  reportDetailLoading.value = true;
+  showReportDetailModal.value = true;
+  try {
+    reportDetail.value = await analyticsStore.fetchReport(report._id);
+  } catch (err) {
+    reportDetailError.value = err.response?.data?.message ?? 'Rapor yüklenemedi.';
+  } finally {
+    reportDetailLoading.value = false;
+  }
+}
+
+function scoreClass(score) {
+  if (score == null) return '';
+  if (score >= 70) return 'score-good';
+  if (score >= 40) return 'score-medium';
+  return 'score-bad';
+}
+
+async function loadTestDetail() {
+  if (!detailSelectedTestId.value) {
+    detailTestData.value = null;
+    return;
+  }
+  detailLoading.value = true;
+  detailError.value = '';
+  try {
+    detailTestData.value = await analyticsStore.fetchTestAnalytics(detailSelectedTestId.value);
+  } catch (err) {
+    detailError.value = err.response?.data?.message ?? 'Test analizi yüklenemedi.';
+    detailTestData.value = null;
+  } finally {
+    detailLoading.value = false;
+  }
+}
+
+async function loadQuestionDetail() {
+  if (!detailSelectedQuestionId.value) {
+    detailQuestionData.value = null;
+    return;
+  }
+  detailLoading.value = true;
+  detailError.value = '';
+  try {
+    detailQuestionData.value = await analyticsStore.fetchQuestionDetail(detailSelectedQuestionId.value);
+  } catch (err) {
+    detailError.value = err.response?.data?.message ?? 'Soru analizi yüklenemedi.';
+    detailQuestionData.value = null;
+  } finally {
+    detailLoading.value = false;
+  }
+}
+
+async function loadDepartmentDetail() {
+  if (!detailSelectedDepartmentId.value) {
+    detailDepartmentData.value = null;
+    return;
+  }
+  detailLoading.value = true;
+  detailError.value = '';
+  try {
+    detailDepartmentData.value = await analyticsStore.fetchDepartmentDetail(detailSelectedDepartmentId.value);
+  } catch (err) {
+    detailError.value = err.response?.data?.message ?? 'Departman analizi yüklenemedi.';
+    detailDepartmentData.value = null;
+  } finally {
+    detailLoading.value = false;
+  }
+}
+
+function setDetailMode(mode) {
+  detailViewMode.value = mode;
+  detailError.value = '';
+}
+
 async function submitGenerateReport() {
   reportError.value = '';
   if (!reportForm.value.periodStart || !reportForm.value.periodEnd) {
@@ -563,6 +664,62 @@ async function openEmployeeReport(emp) {
   }
 }
 
+function openCreateDepartmentModal() {
+  departmentModalMode.value = 'create';
+  departmentForm.value = { id: null, name: '', managerId: '' };
+  departmentError.value = '';
+  showDepartmentModal.value = true;
+}
+
+function openEditDepartmentModal(dept) {
+  departmentModalMode.value = 'edit';
+  departmentForm.value = {
+    id: dept._id,
+    name: dept.name,
+    managerId: dept.managerId?._id ?? dept.managerId ?? '',
+  };
+  departmentError.value = '';
+  showDepartmentModal.value = true;
+}
+
+async function submitDepartmentForm() {
+  departmentError.value = '';
+  if (!departmentForm.value.name.trim()) {
+    departmentError.value = 'Departman adı zorunludur.';
+    return;
+  }
+  departmentLoading.value = true;
+  try {
+    const payload = { name: departmentForm.value.name.trim() };
+    if (departmentForm.value.managerId) payload.managerId = departmentForm.value.managerId;
+
+    if (departmentModalMode.value === 'create') {
+      await departmentStore.createDepartment(payload);
+    } else {
+      await departmentStore.updateDepartment(departmentForm.value.id, payload);
+    }
+    await userStore.fetchUsers({ limit: 50 });
+    showDepartmentModal.value = false;
+  } catch (err) {
+    departmentError.value = err.response?.data?.message ?? 'Departman kaydedilemedi.';
+  } finally {
+    departmentLoading.value = false;
+  }
+}
+
+async function deleteDepartment(dept) {
+  if (!confirm(`"${dept.name}" departmanını silmek istediğinize emin misiniz?`)) return;
+  departmentDeletingId.value = dept._id;
+  try {
+    await departmentStore.deleteDepartment(dept._id);
+    await userStore.fetchUsers({ limit: 50 });
+  } catch (err) {
+    alert(err.response?.data?.message ?? 'Departman silinemedi.');
+  } finally {
+    departmentDeletingId.value = null;
+  }
+}
+
 async function submitAddEmployee() {
   addEmployeeError.value = '';
   addEmployeeLoading.value = true;
@@ -709,7 +866,11 @@ watch(activeTab, async (tab) => {
     }
   } else if (tab === 'Analizler') {
     try {
-      await Promise.all([analyticsStore.listReports(), analyticsStore.fetchQuestionAnalytics()]);
+      await Promise.all([
+        analyticsStore.listReports(),
+        analyticsStore.fetchQuestionAnalytics(),
+        testStore.tests.length ? Promise.resolve() : testStore.fetchTests({ limit: 100 }),
+      ]);
     } catch { /* non-critical */ }
   }
 });
@@ -1445,6 +1606,35 @@ onMounted(async () => {
             </div>
           </div>
 
+          <div class="dept-manage-card card-surface">
+            <div class="dept-manage-header">
+              <h2>Departmanlar</h2>
+              <button class="primary-btn dept-add-btn" type="button" @click="openCreateDepartmentModal">
+                + Yeni Departman
+              </button>
+            </div>
+            <div v-if="!departmentStore.departments.length" class="empty-state small">
+              <p>Henüz departman eklenmemiş.</p>
+            </div>
+            <div v-else class="dept-list">
+              <div v-for="dept in departmentStore.departments" :key="dept._id" class="dept-row">
+                <div class="dept-row-info">
+                  <strong>{{ dept.name }}</strong>
+                  <p>{{ dept.managerId?.fullName ? `Yönetici: ${dept.managerId.fullName}` : 'Yönetici atanmamış' }}</p>
+                </div>
+                <div class="dept-row-actions">
+                  <button class="dept-action-btn" type="button" @click="openEditDepartmentModal(dept)">Düzenle</button>
+                  <button
+                    class="dept-action-btn dept-action-danger"
+                    type="button"
+                    :disabled="departmentDeletingId === dept._id"
+                    @click="deleteDepartment(dept)"
+                  >{{ departmentDeletingId === dept._id ? '…' : 'Sil' }}</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="filter-panel-card card-surface">
             <h2>Personel Arama ve Filtreleme</h2>
             <div class="search-input-wrap">
@@ -1699,7 +1889,8 @@ onMounted(async () => {
             <div
               v-for="report in analyticsStore.reports"
               :key="report._id"
-              class="report-list-row"
+              class="report-list-row clickable"
+              @click="openReportDetail(report)"
             >
               <span class="report-type-chip">{{ REPORT_TYPE_LABELS[report.reportType] }}</span>
               <div class="report-list-meta">
@@ -1717,6 +1908,325 @@ onMounted(async () => {
               </span>
             </div>
           </div>
+        </section>
+
+        <!-- Detailed Analytics -->
+        <section class="section-block detail-analytics-card card-surface">
+          <div class="section-title-row" style="margin-bottom:18px;">
+            <div><h2>Detaylı Analizler</h2><span></span></div>
+          </div>
+
+          <div class="test-subview-tabs">
+            <button
+              class="subview-tab"
+              :class="{ active: detailViewMode === 'test' }"
+              type="button"
+              @click="setDetailMode('test')"
+            >Test Bazlı</button>
+            <button
+              class="subview-tab"
+              :class="{ active: detailViewMode === 'question' }"
+              type="button"
+              @click="setDetailMode('question')"
+            >Soru Bazlı</button>
+            <button
+              class="subview-tab"
+              :class="{ active: detailViewMode === 'department' }"
+              type="button"
+              @click="setDetailMode('department')"
+            >Departman Bazlı</button>
+          </div>
+
+          <!-- Test detail -->
+          <template v-if="detailViewMode === 'test'">
+            <div class="detail-selector-row">
+              <div class="field-group">
+                <label class="field-label">Test Seçin</label>
+                <select v-model="detailSelectedTestId" class="field-select" @change="loadTestDetail">
+                  <option value="">Test seçin…</option>
+                  <option v-for="t in testStore.tests" :key="t._id" :value="t._id">{{ t.title }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div v-if="detailLoading" style="text-align:center;padding:24px;">
+              <div class="spinner" style="width:32px;height:32px;margin:0 auto;"></div>
+            </div>
+            <p v-else-if="detailError" class="form-error">{{ detailError }}</p>
+            <template v-else-if="detailTestData">
+              <div class="detail-stats-grid">
+                <div class="detail-stat-tile">
+                  <span>Atanan</span>
+                  <strong>{{ detailTestData.summary?.assignedCount ?? 0 }}</strong>
+                </div>
+                <div class="detail-stat-tile">
+                  <span>Tamamlayan</span>
+                  <strong>{{ detailTestData.summary?.completedCount ?? 0 }}</strong>
+                </div>
+                <div class="detail-stat-tile">
+                  <span>Ort. Başarı</span>
+                  <strong>%{{ (detailTestData.summary?.avgScore ?? 0).toFixed(1) }}</strong>
+                </div>
+                <div class="detail-stat-tile">
+                  <span>En Yüksek</span>
+                  <strong>%{{ detailTestData.summary?.maxScore ?? 0 }}</strong>
+                </div>
+                <div class="detail-stat-tile">
+                  <span>En Düşük</span>
+                  <strong>%{{ detailTestData.summary?.minScore ?? 0 }}</strong>
+                </div>
+              </div>
+
+              <p class="detail-subhead">Personel Performansı</p>
+              <div class="detail-table-wrap">
+                <table class="detail-table">
+                  <thead>
+                    <tr>
+                      <th>Personel</th>
+                      <th>Departman</th>
+                      <th>Durum</th>
+                      <th>Doğru</th>
+                      <th>Skor</th>
+                      <th>Tamamlama</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="row in detailTestData.userPerformance" :key="row.userId">
+                      <td><strong>{{ row.fullName }}</strong></td>
+                      <td>{{ row.departmentName ?? '—' }}</td>
+                      <td>
+                        <span class="asgn-status-badge" :class="ASSIGNMENT_STATUS_CLASSES[row.status]">
+                          {{ ASSIGNMENT_STATUS_LABELS[row.status] ?? row.status }}
+                        </span>
+                      </td>
+                      <td>{{ row.correctCount ?? '—' }}/{{ row.totalQuestions ?? '—' }}</td>
+                      <td>
+                        <span :class="scoreClass(row.scorePercent)">
+                          {{ row.scorePercent != null ? `%${row.scorePercent}` : '—' }}
+                        </span>
+                      </td>
+                      <td>{{ row.completedAt ? new Date(row.completedAt).toLocaleDateString('tr-TR') : '—' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <p class="detail-subhead">Soru Bazlı Hata Oranları</p>
+              <div class="detail-table-wrap">
+                <table class="detail-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Soru</th>
+                      <th>Deneme</th>
+                      <th>Yanlış</th>
+                      <th>Hata Oranı</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(q, i) in detailTestData.questionStats" :key="q.questionId">
+                      <td>{{ i + 1 }}</td>
+                      <td><strong>{{ q.text }}</strong></td>
+                      <td>{{ q.totalAttempts }}</td>
+                      <td>{{ q.wrongCount }}</td>
+                      <td>
+                        <span :class="scoreClass(100 - (q.errorRate ?? 0))">
+                          %{{ (q.errorRate ?? 0).toFixed(1) }}
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <p class="detail-subhead">Departman Bazlı Performans</p>
+              <div class="detail-table-wrap">
+                <table class="detail-table">
+                  <thead>
+                    <tr>
+                      <th>Departman</th>
+                      <th>Tamamlayan</th>
+                      <th>Ort. Skor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="d in detailTestData.departmentBreakdown" :key="d.departmentName">
+                      <td><strong>{{ d.departmentName }}</strong></td>
+                      <td>{{ d.completedCount }}</td>
+                      <td>
+                        <span :class="scoreClass(d.avgScore)">%{{ (d.avgScore ?? 0).toFixed(1) }}</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </template>
+            <div v-else class="empty-state small"><p>Detayları görmek için bir test seçin.</p></div>
+          </template>
+
+          <!-- Question detail -->
+          <template v-else-if="detailViewMode === 'question'">
+            <div class="detail-selector-row">
+              <div class="field-group">
+                <label class="field-label">Soru Seçin (En Çok Yanlış Yapılanlar)</label>
+                <select v-model="detailSelectedQuestionId" class="field-select" @change="loadQuestionDetail">
+                  <option value="">Soru seçin…</option>
+                  <option
+                    v-for="q in analyticsStore.questionStats"
+                    :key="q._id"
+                    :value="q._id"
+                  >{{ q.questionText?.slice(0, 80) }}{{ q.questionText?.length > 80 ? '…' : '' }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div v-if="detailLoading" style="text-align:center;padding:24px;">
+              <div class="spinner" style="width:32px;height:32px;margin:0 auto;"></div>
+            </div>
+            <p v-else-if="detailError" class="form-error">{{ detailError }}</p>
+            <template v-else-if="detailQuestionData">
+              <div class="detail-stats-grid">
+                <div class="detail-stat-tile">
+                  <span>Toplam Deneme</span>
+                  <strong>{{ detailQuestionData.summary?.totalAttempts ?? 0 }}</strong>
+                </div>
+                <div class="detail-stat-tile">
+                  <span>Yanlış</span>
+                  <strong>{{ detailQuestionData.summary?.wrongCount ?? 0 }}</strong>
+                </div>
+                <div class="detail-stat-tile">
+                  <span>Hata Oranı</span>
+                  <strong>%{{ (detailQuestionData.summary?.errorRate ?? 0).toFixed(1) }}</strong>
+                </div>
+                <div class="detail-stat-tile">
+                  <span>Ort. Süre</span>
+                  <strong>{{ (detailQuestionData.summary?.avgResponseTime ?? 0).toFixed(1) }}sn</strong>
+                </div>
+              </div>
+
+              <p class="detail-subhead">Soru Metni</p>
+              <p style="background:rgba(46,125,122,0.06);padding:12px 14px;border-radius:10px;font-size:0.9rem;">
+                {{ detailQuestionData.question?.text }}
+              </p>
+
+              <p class="detail-subhead">Yanlış Cevap Veren Personeller</p>
+              <div class="detail-table-wrap">
+                <table class="detail-table">
+                  <thead>
+                    <tr>
+                      <th>Personel</th>
+                      <th>Departman</th>
+                      <th>Seçilen Şık</th>
+                      <th>Süre</th>
+                      <th>Tarih</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(row, i) in detailQuestionData.wrongAnswers" :key="i">
+                      <td><strong>{{ row.fullName }}</strong></td>
+                      <td>{{ row.departmentName ?? '—' }}</td>
+                      <td>{{ OPTION_LABELS[row.selectedOptionOrder] ?? row.selectedOptionOrder }}</td>
+                      <td>{{ row.responseTimeSec != null ? `${row.responseTimeSec}sn` : '—' }}</td>
+                      <td>{{ new Date(row.answeredAt).toLocaleDateString('tr-TR') }}</td>
+                    </tr>
+                    <tr v-if="!detailQuestionData.wrongAnswers?.length">
+                      <td colspan="5" style="text-align:center;color:var(--muted);">Bu soruda yanlış cevap kaydı yok.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </template>
+            <div v-else class="empty-state small"><p>Detayları görmek için bir soru seçin.</p></div>
+          </template>
+
+          <!-- Department detail -->
+          <template v-else-if="detailViewMode === 'department'">
+            <div class="detail-selector-row">
+              <div class="field-group">
+                <label class="field-label">Departman Seçin</label>
+                <select v-model="detailSelectedDepartmentId" class="field-select" @change="loadDepartmentDetail">
+                  <option value="">Departman seçin…</option>
+                  <option
+                    v-for="d in departmentStore.departments"
+                    :key="d._id"
+                    :value="d._id"
+                  >{{ d.name }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div v-if="detailLoading" style="text-align:center;padding:24px;">
+              <div class="spinner" style="width:32px;height:32px;margin:0 auto;"></div>
+            </div>
+            <p v-else-if="detailError" class="form-error">{{ detailError }}</p>
+            <template v-else-if="detailDepartmentData">
+              <div class="detail-stats-grid">
+                <div class="detail-stat-tile">
+                  <span>Personel</span>
+                  <strong>{{ detailDepartmentData.summary?.employeeCount ?? 0 }}</strong>
+                </div>
+                <div class="detail-stat-tile">
+                  <span>Tamamlanan Test</span>
+                  <strong>{{ detailDepartmentData.summary?.totalSessions ?? 0 }}</strong>
+                </div>
+                <div class="detail-stat-tile">
+                  <span>Ort. Skor</span>
+                  <strong>%{{ (detailDepartmentData.summary?.avgScore ?? 0).toFixed(1) }}</strong>
+                </div>
+              </div>
+
+              <p class="detail-subhead">Test Bazlı Performans</p>
+              <div class="detail-table-wrap">
+                <table class="detail-table">
+                  <thead>
+                    <tr>
+                      <th>Test</th>
+                      <th>Tamamlayan</th>
+                      <th>Ort. Skor</th>
+                      <th>En Yüksek</th>
+                      <th>En Düşük</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="t in detailDepartmentData.testBreakdown" :key="t.testId">
+                      <td><strong>{{ t.title }}</strong></td>
+                      <td>{{ t.completedCount }}</td>
+                      <td><span :class="scoreClass(t.avgScore)">%{{ (t.avgScore ?? 0).toFixed(1) }}</span></td>
+                      <td>%{{ t.maxScore ?? 0 }}</td>
+                      <td>%{{ t.minScore ?? 0 }}</td>
+                    </tr>
+                    <tr v-if="!detailDepartmentData.testBreakdown?.length">
+                      <td colspan="5" style="text-align:center;color:var(--muted);">Henüz tamamlanmış test yok.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <p class="detail-subhead">Personel Performansı</p>
+              <div class="detail-table-wrap">
+                <table class="detail-table">
+                  <thead>
+                    <tr>
+                      <th>Personel</th>
+                      <th>Tamamlanan Test</th>
+                      <th>Ort. Skor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="u in detailDepartmentData.userBreakdown" :key="u.userId">
+                      <td><strong>{{ u.fullName }}</strong></td>
+                      <td>{{ u.completedCount }}</td>
+                      <td><span :class="scoreClass(u.avgScore)">%{{ (u.avgScore ?? 0).toFixed(1) }}</span></td>
+                    </tr>
+                    <tr v-if="!detailDepartmentData.userBreakdown?.length">
+                      <td colspan="3" style="text-align:center;color:var(--muted);">Henüz tamamlanmış oturum yok.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </template>
+            <div v-else class="empty-state small"><p>Detayları görmek için bir departman seçin.</p></div>
+          </template>
         </section>
 
       </template>
@@ -2055,6 +2565,148 @@ onMounted(async () => {
         <div class="modal-actions">
           <button class="secondary-btn" type="button" @click="showEmployeeReportModal = false">Kapat</button>
         </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════ REPORT DETAIL MODAL ══════════════════════ -->
+    <div v-if="showReportDetailModal" class="modal-overlay" @click.self="showReportDetailModal = false">
+      <div class="modal-card card-surface" style="width:min(720px,100%);max-height:85vh;overflow-y:auto;">
+        <div class="modal-header">
+          <h2>Rapor Detayı</h2>
+          <button class="modal-close" type="button" @click="showReportDetailModal = false">✕</button>
+        </div>
+
+        <div v-if="reportDetailLoading" style="text-align:center;padding:32px 0;">
+          <div class="spinner" style="width:32px;height:32px;margin:0 auto;"></div>
+        </div>
+
+        <p v-else-if="reportDetailError" class="form-error">{{ reportDetailError }}</p>
+
+        <template v-else-if="reportDetail">
+          <div class="assign-target-chip" style="margin-bottom:18px;">
+            <div>
+              <strong>{{ REPORT_TYPE_LABELS[reportDetail.reportType] ?? reportDetail.reportType }}</strong>
+              <p>
+                {{ new Date(reportDetail.periodStart).toLocaleDateString('tr-TR') }} —
+                {{ new Date(reportDetail.periodEnd).toLocaleDateString('tr-TR') }}
+                · Oluşturan: {{ reportDetail.generatedBy?.fullName ?? '—' }}
+              </p>
+            </div>
+            <span class="risk-badge" :class="`risk-${reportDetail.riskLevel}`" style="margin-left:auto;">
+              {{ RISK_LABELS[reportDetail.riskLevel] ?? reportDetail.riskLevel }}
+            </span>
+          </div>
+
+          <div class="detail-stats-grid">
+            <div class="detail-stat-tile">
+              <span>Ort. Başarı</span>
+              <strong>%{{ (reportDetail.avgScore ?? 0).toFixed(1) }}</strong>
+            </div>
+            <div class="detail-stat-tile">
+              <span>Bozulma Oranı</span>
+              <strong>%{{ ((reportDetail.decayRate ?? 0) * 100).toFixed(1) }}</strong>
+            </div>
+            <div class="detail-stat-tile">
+              <span>Toplam Oturum</span>
+              <strong>{{ reportDetail.reportData?.sessionStats?.totalSessions ?? 0 }}</strong>
+            </div>
+            <div class="detail-stat-tile">
+              <span>Aktif Personel</span>
+              <strong>{{ reportDetail.reportData?.sessionStats?.activeEmployeeCount ?? 0 }}</strong>
+            </div>
+          </div>
+
+          <template v-if="reportDetail.reportData?.departmentBreakdown?.length">
+            <p class="detail-subhead">Departman Performansı</p>
+            <div class="detail-table-wrap">
+              <table class="detail-table">
+                <thead>
+                  <tr>
+                    <th>Departman</th>
+                    <th>Oturum</th>
+                    <th>Ort. Skor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="d in reportDetail.reportData.departmentBreakdown" :key="d.departmentName">
+                    <td><strong>{{ d.departmentName }}</strong></td>
+                    <td>{{ d.sessionCount }}</td>
+                    <td><span :class="scoreClass(d.avgScore)">%{{ (d.avgScore ?? 0).toFixed(1) }}</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </template>
+
+          <template v-if="reportDetail.reportData?.knowledgeStats">
+            <p class="detail-subhead">Bilgi Takip İstatistikleri</p>
+            <div class="detail-table-wrap">
+              <table class="detail-table">
+                <tbody>
+                  <tr>
+                    <td>Örneklem</td>
+                    <td><strong>{{ reportDetail.reportData.knowledgeStats.sampleSize ?? 0 }}</strong></td>
+                  </tr>
+                  <tr>
+                    <td>Ort. Hafıza Gücü</td>
+                    <td><strong>{{ (reportDetail.reportData.knowledgeStats.avgEffectiveStrength ?? 0).toFixed(3) }}</strong></td>
+                  </tr>
+                  <tr>
+                    <td>Bozulma Oranı</td>
+                    <td><strong>%{{ ((reportDetail.reportData.knowledgeStats.decayRate ?? 0) * 100).toFixed(1) }}</strong></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </template>
+        </template>
+
+        <div class="modal-actions">
+          <button class="secondary-btn" type="button" @click="showReportDetailModal = false">Kapat</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════ DEPARTMENT MODAL ══════════════════════ -->
+    <div v-if="showDepartmentModal" class="modal-overlay" @click.self="showDepartmentModal = false">
+      <div class="modal-card card-surface">
+        <div class="modal-header">
+          <h2>{{ departmentModalMode === 'create' ? 'Yeni Departman' : 'Departmanı Düzenle' }}</h2>
+          <button class="modal-close" type="button" @click="showDepartmentModal = false">✕</button>
+        </div>
+        <form @submit.prevent="submitDepartmentForm">
+          <div class="step-fields">
+            <div class="field-group">
+              <label class="field-label">Departman Adı *</label>
+              <input
+                v-model="departmentForm.name"
+                class="field-input"
+                type="text"
+                placeholder="örn. Yazılım Geliştirme"
+                maxlength="100"
+                required
+              />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Yönetici (opsiyonel)</label>
+              <select v-model="departmentForm.managerId" class="field-select">
+                <option value="">Yönetici seçilmedi</option>
+                <option
+                  v-for="u in userStore.users.filter((u) => u.isActive)"
+                  :key="u._id"
+                  :value="u._id"
+                >{{ u.fullName }} — {{ u.email }}</option>
+              </select>
+            </div>
+          </div>
+          <p v-if="departmentError" class="form-error" style="margin-top:12px;">{{ departmentError }}</p>
+          <div class="modal-actions">
+            <button class="secondary-btn" type="button" @click="showDepartmentModal = false">İptal</button>
+            <button class="primary-btn" type="submit" :disabled="departmentLoading">
+              {{ departmentLoading ? 'Kaydediliyor…' : (departmentModalMode === 'create' ? 'Departman Ekle' : 'Kaydet') }}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
 

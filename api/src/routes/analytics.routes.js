@@ -9,6 +9,9 @@ import {
   generateReport,
   listReports,
   getReport,
+  getTestAnalytics,
+  getQuestionDetail,
+  getDepartmentDetail,
 } from '../controllers/analytics.controller.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { authorize } from '../middleware/authorize.js';
@@ -29,6 +32,30 @@ router.get(
   [param('userId').isMongoId()],
   validate,
   getEmployeeAnalytics
+);
+
+router.get(
+  '/tests/:testId',
+  authorize('admin', 'hr', 'manager'),
+  [param('testId').isMongoId()],
+  validate,
+  getTestAnalytics
+);
+
+router.get(
+  '/questions/:questionId',
+  authorize('admin', 'hr', 'manager'),
+  [param('questionId').isMongoId()],
+  validate,
+  getQuestionDetail
+);
+
+router.get(
+  '/departments/:departmentId',
+  authorize('admin', 'hr', 'manager'),
+  [param('departmentId').isMongoId()],
+  validate,
+  getDepartmentDetail
 );
 
 router.post(

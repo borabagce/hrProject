@@ -2534,3 +2534,221 @@ a {
 .asgn-inprogress { background: rgba(33, 150, 243, 0.12); color: #1565c0; }
 .asgn-completed  { background: rgba(76, 175, 80, 0.14); color: #2e7d32; }
 .asgn-expired    { background: rgba(233, 30, 140, 0.1); color: var(--pink); }
+
+.dept-manage-card {
+  grid-column: 1 / -1;
+  padding: 22px 24px;
+  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dept-manage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dept-manage-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.dept-add-btn {
+  padding: 8px 16px;
+  font-size: 0.82rem;
+}
+
+.dept-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dept-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(46, 125, 122, 0.1);
+  border-radius: 12px;
+}
+
+.dept-row-info strong {
+  display: block;
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
+.dept-row-info p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.dept-row-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.dept-action-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(46, 125, 122, 0.2);
+  background: rgba(46, 125, 122, 0.06);
+  color: var(--teal);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.dept-action-btn:hover {
+  background: rgba(46, 125, 122, 0.14);
+}
+
+.dept-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dept-action-danger {
+  border-color: rgba(233, 30, 140, 0.25);
+  background: rgba(233, 30, 140, 0.06);
+  color: var(--pink);
+}
+
+.dept-action-danger:hover {
+  background: rgba(233, 30, 140, 0.14);
+}
+
+.report-list-row.clickable {
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.report-list-row.clickable:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 8px 18px rgba(25, 72, 84, 0.08);
+}
+
+.detail-analytics-card {
+  padding: 28px;
+  border-radius: 26px;
+  margin-bottom: 18px;
+}
+
+.detail-selector-row {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.detail-selector-row .field-group {
+  flex: 1 1 240px;
+  min-width: 220px;
+}
+
+.detail-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.detail-stat-tile {
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(46, 125, 122, 0.06);
+  border: 1px solid rgba(46, 125, 122, 0.12);
+}
+
+.detail-stat-tile span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.detail-stat-tile strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink);
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.detail-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.86rem;
+  margin-top: 8px;
+}
+
+.detail-table th,
+.detail-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(46, 125, 122, 0.08);
+}
+
+.detail-table th {
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(46, 125, 122, 0.04);
+}
+
+.detail-table td strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.detail-table .score-good { color: #2e7d32; font-weight: 700; }
+.detail-table .score-medium { color: #e65100; font-weight: 700; }
+.detail-table .score-bad { color: var(--pink); font-weight: 700; }
+
+.detail-table-wrap {
+  margin-top: 10px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(46, 125, 122, 0.1);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.detail-subhead {
+  margin: 20px 0 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.report-detail-section {
+  margin-top: 16px;
+}
+
+.report-detail-section pre {
+  background: rgba(46, 125, 122, 0.05);
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ink);
+  max-height: 320px;
+  overflow-y: auto;
+}
