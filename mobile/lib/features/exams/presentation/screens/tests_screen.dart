@@ -116,18 +116,6 @@ class _TestsScreenState extends ConsumerState<TestsScreen>
             TestsSearchBar(
               onSearchChanged: (String v) => setState(() => _search = v),
             ),
-            const SizedBox(height: AppDimens.spaceMd),
-            Align(
-              alignment: Alignment.centerRight,
-              child: ElevatedButton.icon(
-                onPressed: () => ref.refresh(assignmentsProvider()),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accentPurple,
-                ),
-                icon: const Icon(Icons.refresh),
-                label: const Text(AppStrings.newTest),
-              ),
-            ),
             const SizedBox(height: AppDimens.spaceLg),
             assignments.when(
               data: (List<Assignment> list) =>
