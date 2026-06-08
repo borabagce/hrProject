@@ -4,7 +4,10 @@
       "Bash(node --check src/controllers/analytics.controller.js)",
       "Bash(node --check src/routes/analytics.routes.js)",
       "Bash(npx vite *)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(npm install *)",
+      "Bash(node -e \"import\\('./src/app.js'\\).then\\(\\(\\)=>console.log\\('app.js loads OK'\\)\\).catch\\(e=>{console.error\\('FAIL',e\\);process.exit\\(1\\)}\\)\")",
+      "Bash(npm audit *)"
     ]
   }
 }
