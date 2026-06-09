@@ -2905,7 +2905,7 @@ onMounted(async () => {
               <table class="detail-table">
                 <tbody>
                   <tr>
-                    <td>Örneklem</td>
+                    <td>Takip Kaydı</td>
                     <td><strong>{{ reportDetail.reportData.knowledgeStats.sampleSize ?? 0 }}</strong></td>
                   </tr>
                   <tr>
