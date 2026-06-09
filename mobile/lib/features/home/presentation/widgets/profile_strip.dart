@@ -34,7 +34,7 @@ class ProfileStrip extends StatelessWidget {
             children: <Widget>[
               CircleAvatar(
                 radius: 28,
-                backgroundColor: AppColors.primary.withOpacity(0.15),
+                backgroundColor: AppColors.primary.withValues(alpha: 0.15),
                 child: Text(
                   _initials(fullName),
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -52,8 +52,10 @@ class ProfileStrip extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: AppDimens.spaceXs),
-                    Text(subtitle,
-                        style: Theme.of(context).textTheme.bodySmall),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                   ],
                 ),
               ),
@@ -73,8 +75,8 @@ class ProfileStrip extends StatelessWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: onCalendar,
-                  icon: const Icon(Icons.calendar_today_outlined, size: 18),
-                  label: const Text(AppStrings.calendar),
+                  icon: const Icon(Icons.assignment_outlined, size: 18),
+                  label: const Text(AppStrings.myTests),
                 ),
               ),
             ],

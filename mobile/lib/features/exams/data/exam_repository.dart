@@ -22,8 +22,9 @@ class ExamRepository {
       final Map<String, dynamic> resp = await _api.myAssignments(status);
       final List<dynamic> list = (resp['data'] as List<dynamic>);
       final List<Assignment> assignments = list
-          .map((Object? e) =>
-              Assignment.fromJson(e as Map<String, dynamic>))
+          .map(
+            (Object? e) => Assignment.fromJson(e as Map<String, dynamic>),
+          )
           .toList();
       await _cacheAssignments(assignments);
       return assignments;
@@ -93,6 +94,28 @@ class ExamRepository {
       return result;
     } catch (e, st) {
       throw mapDioError(e, st);
+    }
+  }
+
+  Map<String, IsarQuestion> getQuestionCacheBySession(String sessionId) {
+    final Iterable<MapEntry<String, IsarQuestion>> matches =
+        _db.questions.entries.where(
+      (MapEntry<String, IsarQuestion> e) => e.value.sessionId == sessionId,
+    );
+    return Map<String, IsarQuestion>.fromEntries(matches);
+  }
+
+  Future<Map<String, IsarQuestion>> getOrFetchQuestionsForSession(
+    String sessionId,
+  ) async {
+    final Map<String, IsarQuestion> cached =
+        getQuestionCacheBySession(sessionId);
+    if (cached.isNotEmpty) return cached;
+    try {
+      await fetchSessionQuestions(sessionId);
+      return getQuestionCacheBySession(sessionId);
+    } catch (_) {
+      return <String, IsarQuestion>{};
     }
   }
 

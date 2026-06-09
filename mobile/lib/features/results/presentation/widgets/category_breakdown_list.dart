@@ -19,36 +19,37 @@ class CategoryBreakdownList extends StatelessWidget {
       );
     }
     return Column(
-      children: items
-          .map(
-            (CategoryBreakdown c) => Padding(
-              padding: const EdgeInsets.only(bottom: AppDimens.spaceMd),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: Text(
-                          c.categoryName,
-                          style: Theme.of(context).textTheme.titleSmall,
-                        ),
+      children: <Widget>[
+        for (final CategoryBreakdown c in items)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppDimens.spaceMd),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        c.categoryName,
+                        style: Theme.of(context).textTheme.titleSmall,
                       ),
-                      Text(
-                        '${(100 - c.errorRate).round()}%',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              color: AppColors.scoreColor(100 - c.errorRate),
-                            ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppDimens.spaceXs),
-                  AppProgressBar(percent: 100 - c.errorRate),
-                ],
-              ),
+                    ),
+                    Text(
+                      '${(100 - c.errorRate).round()}%',
+                      style:
+                          Theme.of(context).textTheme.titleSmall?.copyWith(
+                                color:
+                                    AppColors.scoreColor(100 - c.errorRate),
+                              ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppDimens.spaceXs),
+                AppProgressBar(percent: 100 - c.errorRate),
+              ],
             ),
-          )
-          .toList(),
+          ),
+      ],
     );
   }
 }

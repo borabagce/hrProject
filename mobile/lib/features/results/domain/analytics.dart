@@ -12,6 +12,7 @@ class SessionHistoryItem with _$SessionHistoryItem {
     required int scorePercent,
     required int correctCount,
     required int totalQuestions,
+    String? testTitle,
     DateTime? completedAt,
   }) = _SessionHistoryItem;
 

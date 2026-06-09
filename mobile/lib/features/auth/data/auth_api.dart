@@ -14,4 +14,14 @@ abstract class AuthApi {
 
   @GET(AppEndpoints.me)
   Future<Map<String, dynamic>> me();
+
+  @PATCH(AppEndpoints.myProfile)
+  Future<Map<String, dynamic>> updateProfile(
+    @Body() Map<String, dynamic> body,
+  );
+
+  @POST(AppEndpoints.changePassword)
+  Future<Map<String, dynamic>> changePassword(
+    @Body() Map<String, dynamic> body,
+  );
 }

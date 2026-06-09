@@ -120,8 +120,8 @@ class _TestsScreenState extends ConsumerState<TestsScreen>
             assignments.when(
               data: (List<Assignment> list) =>
                   _buildSections(list.where(_matches).toList()),
-              loading: () => Column(
-                children: const <Widget>[
+              loading: () => const Column(
+                children: <Widget>[
                   ShimmerBox(height: 96),
                   SizedBox(height: AppDimens.spaceMd),
                   ShimmerBox(height: 96),
@@ -151,15 +151,21 @@ class _TestsScreenState extends ConsumerState<TestsScreen>
         icon: Icons.assignment_outlined,
       );
     }
-    final List<Assignment> inProgress = list
-        .where((Assignment a) => a.status == AssignmentStatus.inProgress)
-        .toList();
-    final List<Assignment> pending = list
-        .where((Assignment a) => a.status == AssignmentStatus.pending)
-        .toList();
-    final List<Assignment> completed = list
-        .where((Assignment a) => a.status == AssignmentStatus.completed)
-        .toList();
+    final List<Assignment> inProgress = <Assignment>[];
+    final List<Assignment> pending = <Assignment>[];
+    final List<Assignment> completed = <Assignment>[];
+    for (final Assignment a in list) {
+      switch (a.status) {
+        case AssignmentStatus.inProgress:
+          inProgress.add(a);
+        case AssignmentStatus.pending:
+          pending.add(a);
+        case AssignmentStatus.completed:
+          completed.add(a);
+        case AssignmentStatus.expired:
+          break;
+      }
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

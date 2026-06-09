@@ -82,7 +82,7 @@ class _LoginFormState extends State<LoginForm> {
             Container(
               padding: const EdgeInsets.all(AppDimens.spaceMd),
               decoration: BoxDecoration(
-                color: AppColors.error.withOpacity(0.08),
+                color: AppColors.error.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(AppDimens.radiusMd),
               ),
               child: Row(

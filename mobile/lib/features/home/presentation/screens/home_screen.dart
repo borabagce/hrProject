@@ -76,15 +76,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final AuthState? auth = ref.watch(authNotifierProvider).valueOrNull;
-    final String name = switch (auth) {
-      AuthAuthenticated(:final user) => _firstName(user.fullName),
-      _ => '',
-    };
-    final String role = switch (auth) {
-      AuthAuthenticated(:final user) => user.role.toUpperCase(),
-      _ => '',
-    };
+    final String name = ref.watch(
+      authNotifierProvider.select((AsyncValue<AuthState> v) {
+        final AuthState? auth = v.valueOrNull;
+        return switch (auth) {
+          AuthAuthenticated(:final user) => _firstName(user.fullName),
+          _ => '',
+        };
+      }),
+    );
+    final String fullName = ref.watch(
+      authNotifierProvider.select((AsyncValue<AuthState> v) {
+        final AuthState? auth = v.valueOrNull;
+        return switch (auth) {
+          AuthAuthenticated(:final user) => user.fullName,
+          _ => '—',
+        };
+      }),
+    );
+    final String role = ref.watch(
+      authNotifierProvider.select((AsyncValue<AuthState> v) {
+        final AuthState? auth = v.valueOrNull;
+        return switch (auth) {
+          AuthAuthenticated(:final user) => user.role.toUpperCase(),
+          _ => '',
+        };
+      }),
+    );
 
     final AsyncValue<List<Assignment>> assignments =
         ref.watch(assignmentsProvider());
@@ -118,10 +136,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   dotColor: AppColors.success,
                 ),
                 ProfileStrip(
-                  fullName: switch (auth) {
-                    AuthAuthenticated(:final user) => user.fullName,
-                    _ => '—',
-                  },
+                  fullName: fullName,
                   subtitle: role,
                   onEdit: () => context.go(AppRoutes.profile),
                   onCalendar: () => context.go(AppRoutes.tests),
@@ -133,18 +148,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ),
                 AnalyticsTileRow(
                   onPerformance: () => context.go(AppRoutes.analytics),
-                  onStress: () => context.go(AppRoutes.analytics),
-                ),
-                const SizedBox(height: AppDimens.spaceLg),
-                Center(
-                  child: ElevatedButton.icon(
-                    onPressed: () => context.go(AppRoutes.analytics),
-                    icon: const Icon(Icons.arrow_forward_rounded),
-                    label: const Text(AppStrings.detailedReports),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accentPurple,
-                    ),
-                  ),
+                  onReports: () => context.go(AppRoutes.analytics),
                 ),
               ],
             ),
@@ -201,8 +205,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ],
         );
       },
-      loading: () => Column(
-        children: const <Widget>[
+      loading: () => const Column(
+        children: <Widget>[
           ShimmerBox(height: 120),
           SizedBox(height: AppDimens.spaceMd),
           ShimmerBox(height: 96),

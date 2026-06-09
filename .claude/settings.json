@@ -7,7 +7,10 @@
       "Bash(node -e ' *)",
       "Bash(npm install *)",
       "Bash(node -e \"import\\('./src/app.js'\\).then\\(\\(\\)=>console.log\\('app.js loads OK'\\)\\).catch\\(e=>{console.error\\('FAIL',e\\);process.exit\\(1\\)}\\)\")",
-      "Bash(npm audit *)"
+      "Bash(npm audit *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Borab\\\\Desktop\\\\projects\\\\sitelerim\\\\dersSite\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(dart analyze *)"
     ]
   }
 }

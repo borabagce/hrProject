@@ -73,6 +73,26 @@ class AuthNotifier extends _$AuthNotifier {
     state = const AsyncValue<AuthState>.data(AuthUnauthenticated());
   }
 
+  Future<void> updateFullName(String fullName) async {
+    final AuthRepository repo = ref.read(authRepositoryProvider);
+    await repo.updateProfile(fullName: fullName);
+    final AuthUser? user = await repo.fetchMe();
+    if (user != null) {
+      state = AsyncValue<AuthState>.data(AuthAuthenticated(user));
+    }
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final AuthRepository repo = ref.read(authRepositoryProvider);
+    await repo.changePassword(
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    );
+  }
+
   Future<void> forceLogout() async {
     final AuthRepository repo = ref.read(authRepositoryProvider);
     await repo.clearSession();

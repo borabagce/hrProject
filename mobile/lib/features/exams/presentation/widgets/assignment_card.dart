@@ -93,7 +93,7 @@ class _StatusGlyph extends StatelessWidget {
       width: 44,
       height: 44,
       decoration: BoxDecoration(
-        color: bg.withOpacity(0.12),
+        color: bg.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(AppDimens.radiusMd),
       ),
       child: Icon(icon, color: bg, size: 24),

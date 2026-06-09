@@ -22,7 +22,7 @@ class OptionTile extends StatelessWidget {
     final Color borderColor =
         isSelected ? AppColors.primary : AppColors.divider;
     final Color bg = isSelected
-        ? AppColors.primary.withOpacity(0.06)
+        ? AppColors.primary.withValues(alpha: 0.06)
         : AppColors.surface;
 
     return Material(
@@ -51,7 +51,7 @@ class OptionTile extends StatelessWidget {
                   shape: BoxShape.circle,
                   color: isSelected
                       ? AppColors.primary
-                      : AppColors.divider.withOpacity(0.6),
+                      : AppColors.divider.withValues(alpha: 0.6),
                 ),
                 child: Text(
                   label,

@@ -15,6 +15,7 @@ _$SessionHistoryItemImpl _$$SessionHistoryItemImplFromJson(
       scorePercent: (json['scorePercent'] as num).toInt(),
       correctCount: (json['correctCount'] as num).toInt(),
       totalQuestions: (json['totalQuestions'] as num).toInt(),
+      testTitle: json['testTitle'] as String?,
       completedAt: json['completedAt'] == null
           ? null
           : DateTime.parse(json['completedAt'] as String),
@@ -29,6 +30,7 @@ Map<String, dynamic> _$$SessionHistoryItemImplToJson(
       'scorePercent': instance.scorePercent,
       'correctCount': instance.correctCount,
       'totalQuestions': instance.totalQuestions,
+      'testTitle': instance.testTitle,
       'completedAt': instance.completedAt?.toIso8601String(),
     };
 

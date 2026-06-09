@@ -27,6 +27,7 @@ mixin _$SessionHistoryItem {
   int get scorePercent => throw _privateConstructorUsedError;
   int get correctCount => throw _privateConstructorUsedError;
   int get totalQuestions => throw _privateConstructorUsedError;
+  String? get testTitle => throw _privateConstructorUsedError;
   DateTime? get completedAt => throw _privateConstructorUsedError;
 
   /// Serializes this SessionHistoryItem to a JSON map.
@@ -52,6 +53,7 @@ abstract class $SessionHistoryItemCopyWith<$Res> {
       int scorePercent,
       int correctCount,
       int totalQuestions,
+      String? testTitle,
       DateTime? completedAt});
 }
 
@@ -76,6 +78,7 @@ class _$SessionHistoryItemCopyWithImpl<$Res, $Val extends SessionHistoryItem>
     Object? scorePercent = null,
     Object? correctCount = null,
     Object? totalQuestions = null,
+    Object? testTitle = freezed,
     Object? completedAt = freezed,
   }) {
     return _then(_value.copyWith(
@@ -103,6 +106,10 @@ class _$SessionHistoryItemCopyWithImpl<$Res, $Val extends SessionHistoryItem>
           ? _value.totalQuestions
           : totalQuestions // ignore: cast_nullable_to_non_nullable
               as int,
+      testTitle: freezed == testTitle
+          ? _value.testTitle
+          : testTitle // ignore: cast_nullable_to_non_nullable
+              as String?,
       completedAt: freezed == completedAt
           ? _value.completedAt
           : completedAt // ignore: cast_nullable_to_non_nullable
@@ -126,6 +133,7 @@ abstract class _$$SessionHistoryItemImplCopyWith<$Res>
       int scorePercent,
       int correctCount,
       int totalQuestions,
+      String? testTitle,
       DateTime? completedAt});
 }
 
@@ -148,6 +156,7 @@ class __$$SessionHistoryItemImplCopyWithImpl<$Res>
     Object? scorePercent = null,
     Object? correctCount = null,
     Object? totalQuestions = null,
+    Object? testTitle = freezed,
     Object? completedAt = freezed,
   }) {
     return _then(_$SessionHistoryItemImpl(
@@ -175,6 +184,10 @@ class __$$SessionHistoryItemImplCopyWithImpl<$Res>
           ? _value.totalQuestions
           : totalQuestions // ignore: cast_nullable_to_non_nullable
               as int,
+      testTitle: freezed == testTitle
+          ? _value.testTitle
+          : testTitle // ignore: cast_nullable_to_non_nullable
+              as String?,
       completedAt: freezed == completedAt
           ? _value.completedAt
           : completedAt // ignore: cast_nullable_to_non_nullable
@@ -193,6 +206,7 @@ class _$SessionHistoryItemImpl implements _SessionHistoryItem {
       required this.scorePercent,
       required this.correctCount,
       required this.totalQuestions,
+      this.testTitle,
       this.completedAt});
 
   factory _$SessionHistoryItemImpl.fromJson(Map<String, dynamic> json) =>
@@ -212,11 +226,13 @@ class _$SessionHistoryItemImpl implements _SessionHistoryItem {
   @override
   final int totalQuestions;
   @override
+  final String? testTitle;
+  @override
   final DateTime? completedAt;
 
   @override
   String toString() {
-    return 'SessionHistoryItem(id: $id, weekNumber: $weekNumber, year: $year, scorePercent: $scorePercent, correctCount: $correctCount, totalQuestions: $totalQuestions, completedAt: $completedAt)';
+    return 'SessionHistoryItem(id: $id, weekNumber: $weekNumber, year: $year, scorePercent: $scorePercent, correctCount: $correctCount, totalQuestions: $totalQuestions, testTitle: $testTitle, completedAt: $completedAt)';
   }
 
   @override
@@ -234,6 +250,8 @@ class _$SessionHistoryItemImpl implements _SessionHistoryItem {
                 other.correctCount == correctCount) &&
             (identical(other.totalQuestions, totalQuestions) ||
                 other.totalQuestions == totalQuestions) &&
+            (identical(other.testTitle, testTitle) ||
+                other.testTitle == testTitle) &&
             (identical(other.completedAt, completedAt) ||
                 other.completedAt == completedAt));
   }
@@ -241,7 +259,7 @@ class _$SessionHistoryItemImpl implements _SessionHistoryItem {
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(runtimeType, id, weekNumber, year,
-      scorePercent, correctCount, totalQuestions, completedAt);
+      scorePercent, correctCount, totalQuestions, testTitle, completedAt);
 
   /// Create a copy of SessionHistoryItem
   /// with the given fields replaced by the non-null parameter values.
@@ -268,6 +286,7 @@ abstract class _SessionHistoryItem implements SessionHistoryItem {
       required final int scorePercent,
       required final int correctCount,
       required final int totalQuestions,
+      final String? testTitle,
       final DateTime? completedAt}) = _$SessionHistoryItemImpl;
 
   factory _SessionHistoryItem.fromJson(Map<String, dynamic> json) =
@@ -286,6 +305,8 @@ abstract class _SessionHistoryItem implements SessionHistoryItem {
   int get correctCount;
   @override
   int get totalQuestions;
+  @override
+  String? get testTitle;
   @override
   DateTime? get completedAt;
 

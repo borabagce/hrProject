@@ -64,4 +64,18 @@ class AppStrings {
   static const String correctCount = 'Doğru';
   static const String totalQuestions = 'Toplam Soru';
   static const String questionBreakdown = 'Soru Detayı';
+  static const String completedOn = 'Çözüldüğü Tarih';
+  static const String givenAnswer = 'Verilen Cevap';
+  static const String correctOptionLabel = 'Doğru Seçenek';
+
+  static const String editProfileTitle = 'Profil Düzenle';
+  static const String fullNameLabel = 'Ad Soyad';
+  static const String save = 'Kaydet';
+  static const String changePasswordTitle = 'Şifre Değiştir';
+  static const String currentPasswordLabel = 'Mevcut Şifre';
+  static const String newPasswordLabel = 'Yeni Şifre';
+  static const String confirmPasswordLabel = 'Şifre Tekrar';
+  static const String passwordsNotMatch = 'Şifreler eşleşmiyor';
+  static const String profileUpdated = 'Profil güncellendi';
+  static const String passwordChanged = 'Şifre değiştirildi';
 }

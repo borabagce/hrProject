@@ -5,7 +5,14 @@ import '../../../../core/theme/app_dimens.dart';
 import '../../../../core/widgets/app_card.dart';
 
 class ProfileSettingsSection extends StatelessWidget {
-  const ProfileSettingsSection({super.key});
+  const ProfileSettingsSection({
+    required this.onEditProfile,
+    required this.onChangePassword,
+    super.key,
+  });
+
+  final VoidCallback onEditProfile;
+  final VoidCallback onChangePassword;
 
   @override
   Widget build(BuildContext context) {
@@ -16,19 +23,13 @@ class ProfileSettingsSection extends StatelessWidget {
           _Tile(
             icon: Icons.edit_outlined,
             label: 'Profilimi Düzenle',
-            onTap: () {},
-          ),
-          const Divider(height: 0),
-          _Tile(
-            icon: Icons.notifications_outlined,
-            label: 'Bildirim Ayarları',
-            onTap: () {},
+            onTap: onEditProfile,
           ),
           const Divider(height: 0),
           _Tile(
             icon: Icons.lock_outline_rounded,
             label: 'Şifre Değiştir',
-            onTap: () {},
+            onTap: onChangePassword,
           ),
         ],
       ),

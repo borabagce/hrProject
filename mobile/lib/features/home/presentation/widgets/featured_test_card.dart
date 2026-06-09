@@ -55,7 +55,7 @@ class FeaturedTestCard extends StatelessWidget {
             width: 84,
             height: 84,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.08),
+              color: AppColors.primary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(AppDimens.radiusLg),
             ),
             child: const Icon(

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimens.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../auth/domain/auth_user.dart';
@@ -23,7 +22,7 @@ class ProfileHeader extends StatelessWidget {
         children: <Widget>[
           CircleAvatar(
             radius: 34,
-            backgroundColor: Colors.white.withOpacity(0.2),
+            backgroundColor: Colors.white.withValues(alpha:0.2),
             child: Text(
               _initials(user?.fullName ?? '—'),
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -46,7 +45,7 @@ class ProfileHeader extends StatelessWidget {
                 Text(
                   user?.email ?? '—',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withOpacity(0.85),
+                        color: Colors.white.withValues(alpha:0.85),
                       ),
                 ),
               ],

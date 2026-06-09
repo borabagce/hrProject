@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_strings.dart';
-import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimens.dart';
 import '../../../../core/widgets/app_card.dart';
 
 class AnalyticsTileRow extends StatelessWidget {
   const AnalyticsTileRow({
     required this.onPerformance,
-    required this.onStress,
+    required this.onReports,
     super.key,
   });
 
   final VoidCallback onPerformance;
-  final VoidCallback onStress;
+  final VoidCallback onReports;
 
   @override
   Widget build(BuildContext context) {
@@ -34,14 +33,14 @@ class AnalyticsTileRow extends StatelessWidget {
         const SizedBox(width: AppDimens.spaceMd),
         Expanded(
           child: _Tile(
-            title: AppStrings.stressAnalysis,
-            icon: Icons.psychology_alt_outlined,
+            title: AppStrings.detailedReports,
+            icon: Icons.bar_chart_rounded,
             gradient: const LinearGradient(
-              colors: <Color>[Color(0xFFFFC078), Color(0xFFFF9F40)],
+              colors: <Color>[Color(0xFF4DB6AC), Color(0xFF2A9D8F)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            onTap: onStress,
+            onTap: onReports,
           ),
         ),
       ],
@@ -83,7 +82,7 @@ class _Tile extends StatelessWidget {
             ),
             Align(
               alignment: Alignment.bottomRight,
-              child: Icon(icon, size: 48, color: Colors.white.withOpacity(0.85)),
+              child: Icon(icon, size: 48, color: Colors.white.withValues(alpha: 0.85)),
             ),
           ],
         ),

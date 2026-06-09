@@ -36,8 +36,8 @@ class AnalyticsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: AppDimens.spaceLg),
             data.when(
-              loading: () => Column(
-                children: const <Widget>[
+              loading: () => const Column(
+                children: <Widget>[
                   ShimmerBox(height: 220),
                   SizedBox(height: AppDimens.spaceMd),
                   ShimmerBox(height: 120),
@@ -128,7 +128,7 @@ class _HistoryRow extends StatelessWidget {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: AppColors.scoreColor(item.scorePercent.toDouble())
-                  .withOpacity(0.15),
+                  .withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(AppDimens.radiusMd),
             ),
             child: Text(
@@ -144,7 +144,9 @@ class _HistoryRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  'Hafta ${item.weekNumber} / ${item.year}',
+                  item.testTitle?.isNotEmpty == true
+                      ? item.testTitle!
+                      : 'Hafta ${item.weekNumber} / ${item.year}',
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 Text(date, style: Theme.of(context).textTheme.bodySmall),

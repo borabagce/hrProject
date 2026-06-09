@@ -47,6 +47,28 @@ class AuthRepository {
     }
   }
 
+  Future<void> updateProfile({required String fullName}) async {
+    try {
+      await _api.updateProfile(<String, dynamic>{'fullName': fullName});
+    } catch (e, st) {
+      throw mapDioError(e, st);
+    }
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await _api.changePassword(<String, dynamic>{
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      });
+    } catch (e, st) {
+      throw mapDioError(e, st);
+    }
+  }
+
   Future<bool> hasStoredSession() async {
     final String? access = await _tokens.readAccess();
     return access != null && access.isNotEmpty;

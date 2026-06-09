@@ -17,8 +17,30 @@ class AnalyticsRepository {
       final Map<String, dynamic> resp = await _api.myAnalytics();
       final Map<String, dynamic> data =
           resp['data'] as Map<String, dynamic>;
+
+      final List<dynamic> rawHistory =
+          (data['sessionHistory'] as List<dynamic>?) ?? <dynamic>[];
+      final List<Map<String, dynamic>> enrichedHistory =
+          rawHistory.map((dynamic item) {
+        if (item is! Map<String, dynamic>) return <String, dynamic>{};
+        String? title = item['testTitle'] as String?;
+        if (title == null || title.isEmpty) {
+          final Object? nested = item['testId'];
+          if (nested is Map<String, dynamic>) {
+            title = nested['title'] as String?;
+          }
+        }
+        if (title == null || title.isEmpty) {
+          final Object? nested = item['test'];
+          if (nested is Map<String, dynamic>) {
+            title = nested['title'] as String?;
+          }
+        }
+        return <String, dynamic>{...item, 'testTitle': title};
+      }).toList();
+
       return MyAnalytics.fromJson(<String, dynamic>{
-        'sessionHistory': data['sessionHistory'] ?? <dynamic>[],
+        'sessionHistory': enrichedHistory,
         'wrongByCategory': data['wrongByCategory'] ?? <dynamic>[],
         'weeklyTrend': data['weeklyTrend'] ?? <dynamic>[],
       });

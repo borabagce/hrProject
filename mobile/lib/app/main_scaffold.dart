@@ -22,6 +22,26 @@ class MainScaffold extends StatelessWidget {
     _NavItem(AppRoutes.profile, Icons.menu_rounded, AppStrings.tabMore),
   ];
 
+  static const List<BottomNavigationBarItem> _navItems =
+      <BottomNavigationBarItem>[
+    BottomNavigationBarItem(
+      icon: Icon(Icons.home_filled),
+      label: AppStrings.tabHome,
+    ),
+    BottomNavigationBarItem(
+      icon: Icon(Icons.assignment_outlined),
+      label: AppStrings.tabTests,
+    ),
+    BottomNavigationBarItem(
+      icon: Icon(Icons.bar_chart_rounded),
+      label: AppStrings.tabAnalytics,
+    ),
+    BottomNavigationBarItem(
+      icon: Icon(Icons.menu_rounded),
+      label: AppStrings.tabMore,
+    ),
+  ];
+
   int _indexFromLocation(String location) {
     for (int i = 0; i < _items.length; i++) {
       if (location.startsWith(_items[i].path)) return i;
@@ -57,14 +77,7 @@ class MainScaffold extends StatelessWidget {
           child: BottomNavigationBar(
             currentIndex: index,
             onTap: (int i) => context.go(_items[i].path),
-            items: _items
-                .map(
-                  (_NavItem n) => BottomNavigationBarItem(
-                    icon: Icon(n.icon),
-                    label: n.label,
-                  ),
-                )
-                .toList(),
+            items: _navItems,
           ),
         ),
       ),
