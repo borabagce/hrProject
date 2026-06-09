@@ -788,9 +788,23 @@ a {
   position: absolute;
   inset: 26px 24px 34px 24px;
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
   align-items: end;
   gap: 10px;
+}
+
+.chart-dept-labels {
+  display: grid;
+  gap: 10px;
+  padding: 6px 24px 0;
+}
+
+.chart-dept-labels span {
+  text-align: center;
+  font-size: 0.65rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .bar {
@@ -801,45 +815,6 @@ a {
   box-shadow: 0 10px 18px rgba(233, 30, 140, 0.18);
 }
 
-.line-chart {
-  position: absolute;
-  inset: 20px 22px 26px;
-}
-
-.trend-line {
-  fill: none;
-  stroke: #2c3137;
-  stroke-width: 2.2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.chart-dots {
-  position: absolute;
-  left: 50%;
-  bottom: 8px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  transform: translateX(-50%);
-}
-
-.dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #c2c7cd;
-}
-
-.dot.active {
-  background: var(--pink);
-}
-
-.dot.muted {
-  width: 16px;
-  height: 3px;
-  border-radius: 999px;
-}
 
 .center-cta {
   justify-content: center;
@@ -1002,40 +977,6 @@ a {
   gap: 20px;
 }
 
-.wizard-steps-row {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  flex-wrap: wrap;
-}
-
-.step-preview-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-radius: 14px;
-  border: 1px solid rgba(46, 125, 122, 0.12);
-  background: rgba(255, 255, 255, 0.66);
-  font-size: 0.88rem;
-}
-
-.step-preview-card.active {
-  background: linear-gradient(180deg, #d8edf4, #edf8fb);
-  border-color: rgba(46, 125, 122, 0.2);
-  font-weight: 700;
-}
-
-.step-preview-icon {
-  font-size: 1rem;
-  color: var(--teal);
-}
-
-.step-preview-arrow {
-  font-size: 1.4rem;
-  color: var(--muted);
-  padding: 0 10px;
-}
 
 .draft-bar {
   display: grid;
@@ -1494,15 +1435,6 @@ a {
     border-radius: 18px;
   }
 
-  .wizard-steps-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .step-preview-arrow {
-    display: none;
-  }
 }
 
 /* ── FIELD ROW 2 (2-column) ── */

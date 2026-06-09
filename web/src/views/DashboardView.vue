@@ -36,13 +36,6 @@ const wizardSteps = [
   { id: 3, label: 'Atama & Yayınlama' },
 ];
 
-const createStepsPreview = [
-  { title: '1. Test Türü Seç', icon: '◫' },
-  { title: '2. Sorular Ekle', icon: '▣' },
-  { title: '3. Personel Ata', icon: '◉' },
-  { title: 'Taslakla', icon: '···' },
-];
-
 // ─── UI state ──────────────────────────────────────────────────────────────
 const activeTab = ref('Anasayfa');
 const loading = ref(true);
@@ -232,14 +225,14 @@ const deptChips = computed(() => [
 
 const reportCards = computed(() => {
   const depts = analyticsStore.departments.slice(0, 7);
-  const pad = (arr) => [...arr, ...Array(Math.max(0, 7 - arr.length)).fill(0)];
-  const scores = pad(depts.map((d) => d.avgScore ?? 0));
-  const sessions = pad(depts.map((d) => d.totalSessions ?? 0));
+  const scores = depts.map((d) => d.avgScore ?? 0);
+  const sessions = depts.map((d) => d.totalSessions ?? 0);
+  const labels = depts.map((d) => d.departmentName?.slice(0, 5) ?? '?');
+  const maxScore = Math.max(...scores, 1);
   const maxSessions = Math.max(...sessions, 1);
-  const normalizedSessions = sessions.map((v) => Math.round((v / maxSessions) * 80));
   return [
-    { title: 'Performans Analizi', subtitle: 'Departman ortalamaları', bars: scores, line: scores },
-    { title: 'Takım Analizi', subtitle: 'Oturum dağılımı', bars: normalizedSessions, line: normalizedSessions },
+    { title: 'Performans Analizi', subtitle: 'Ort. test skoru (%)', bars: scores, labels, max: maxScore },
+    { title: 'Takım Analizi', subtitle: 'Toplam oturum sayısı', bars: sessions, labels, max: maxSessions },
   ];
 });
 
@@ -324,16 +317,8 @@ function miniDonutStroke(item, index) {
   };
 }
 
-function barHeight(value) {
-  return `${Math.max(4, value)}%`;
-}
-
-function linePoints(values) {
-  const width = 260;
-  const height = 130;
-  const max = Math.max(...values, 1);
-  const stepX = width / (values.length - 1);
-  return values.map((v, i) => `${i * stepX},${height - (v / max) * 105 - 10}`).join(' ');
+function barHeight(value, max) {
+  return `${Math.max(4, Math.round((value / (max || 1)) * 92))}%`;
 }
 
 // ─── Wizard navigation ─────────────────────────────────────────────────────
@@ -1086,16 +1071,6 @@ onMounted(async () => {
         </section>
 
         <section class="wizard-preview card-surface">
-          <div class="wizard-steps-row">
-            <template v-for="(step, i) in createStepsPreview" :key="step.title">
-              <div class="step-preview-card" :class="{ active: i === 0 }">
-                <div class="step-preview-icon">{{ step.icon }}</div>
-                <strong>{{ step.title }}</strong>
-              </div>
-              <span v-if="i < createStepsPreview.length - 1" class="step-preview-arrow">›</span>
-            </template>
-          </div>
-
           <div class="draft-bar">
             <div class="section-headline">
               <h2>Son Oluşturulan Testler</h2>
@@ -1123,7 +1098,8 @@ onMounted(async () => {
 
         <section class="section-block">
           <div class="section-title-row">
-            <div><h2>Personel Takibi</h2><span></span></div>
+            <div></div>
+            <a href="#" @click.prevent="activeTab = 'Personeller'" style="font-size:0.82rem;color:var(--muted);text-decoration:none;">Personeller sayfasına git →</a>
           </div>
           <div v-if="!employees.length" class="empty-state">
             <p>Henüz personel eklenmemiş.</p>
@@ -1145,7 +1121,7 @@ onMounted(async () => {
               <div class="employee-actions">
                 <button type="button" @click="openAssignTestModal(emp)">Test ata</button>
                 <button type="button" @click="openEmployeeReport(emp)">Raporu gör</button>
-                <button type="button" @click="activeTab = 'Personeller'">Takip</button>
+                <button type="button" @click="activeTab = 'Personeller'">Görüntüle</button>
               </div>
             </article>
           </div>
@@ -1188,18 +1164,14 @@ onMounted(async () => {
                 <h3>{{ card.title }}</h3>
                 <span class="chart-subtitle">{{ card.subtitle }}</span>
               </div>
-              <div class="chart-panel">
-                <div class="bars">
-                  <span v-for="(bar, i) in card.bars" :key="i" class="bar" :style="{ height: barHeight(bar) }"></span>
+              <div v-if="card.bars.length" class="chart-panel">
+                <div class="bars" :style="{ gridTemplateColumns: `repeat(${card.bars.length}, 1fr)` }">
+                  <span v-for="(bar, i) in card.bars" :key="i" class="bar" :style="{ height: barHeight(bar, card.max) }"></span>
                 </div>
-                <svg viewBox="0 0 260 130" class="line-chart" aria-hidden="true">
-                  <polyline :points="linePoints(card.line)" class="trend-line"></polyline>
-                </svg>
-                <div class="chart-dots">
-                  <span class="dot active"></span>
-                  <span class="dot"></span>
-                  <span class="dot muted"></span>
-                </div>
+              </div>
+              <div v-else class="empty-state small"><p>Veri yok</p></div>
+              <div v-if="card.bars.length" class="chart-dept-labels" :style="{ gridTemplateColumns: `repeat(${card.bars.length}, 1fr)` }">
+                <span v-for="label in card.labels" :key="label">{{ label }}</span>
               </div>
             </article>
           </div>
@@ -2361,18 +2333,14 @@ onMounted(async () => {
                 <h3>{{ card.title }}</h3>
                 <span class="chart-subtitle">{{ card.subtitle }}</span>
               </div>
-              <div class="chart-panel">
-                <div class="bars">
-                  <span v-for="(bar, i) in card.bars" :key="i" class="bar" :style="{ height: barHeight(bar) }"></span>
+              <div v-if="card.bars.length" class="chart-panel">
+                <div class="bars" :style="{ gridTemplateColumns: `repeat(${card.bars.length}, 1fr)` }">
+                  <span v-for="(bar, i) in card.bars" :key="i" class="bar" :style="{ height: barHeight(bar, card.max) }"></span>
                 </div>
-                <svg viewBox="0 0 260 130" class="line-chart" aria-hidden="true">
-                  <polyline :points="linePoints(card.line)" class="trend-line"></polyline>
-                </svg>
-                <div class="chart-dots">
-                  <span class="dot active"></span>
-                  <span class="dot"></span>
-                  <span class="dot muted"></span>
-                </div>
+              </div>
+              <div v-else class="empty-state small"><p>Veri yok</p></div>
+              <div v-if="card.bars.length" class="chart-dept-labels" :style="{ gridTemplateColumns: `repeat(${card.bars.length}, 1fr)` }">
+                <span v-for="label in card.labels" :key="label">{{ label }}</span>
               </div>
             </article>
           </div>
@@ -2896,7 +2864,7 @@ onMounted(async () => {
               <strong>%{{ (reportDetail.avgScore ?? 0).toFixed(1) }}</strong>
             </div>
             <div class="detail-stat-tile">
-              <span>Bozulma Oranı</span>
+              <span>Unutma Oranı</span>
               <strong>%{{ ((reportDetail.decayRate ?? 0) * 100).toFixed(1) }}</strong>
             </div>
             <div class="detail-stat-tile">
@@ -2941,11 +2909,11 @@ onMounted(async () => {
                     <td><strong>{{ reportDetail.reportData.knowledgeStats.sampleSize ?? 0 }}</strong></td>
                   </tr>
                   <tr>
-                    <td>Ort. Hafıza Gücü</td>
+                    <td>Ort. Bilgi Kalıcılığı</td>
                     <td><strong>{{ (reportDetail.reportData.knowledgeStats.avgEffectiveStrength ?? 0).toFixed(3) }}</strong></td>
                   </tr>
                   <tr>
-                    <td>Bozulma Oranı</td>
+                    <td>Unutma Oranı</td>
                     <td><strong>%{{ ((reportDetail.reportData.knowledgeStats.decayRate ?? 0) * 100).toFixed(1) }}</strong></td>
                   </tr>
                 </tbody>
