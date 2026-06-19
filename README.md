@@ -4,7 +4,7 @@ Kurumsal İK (İnsan Kaynakları) bilgi değerlendirme platformu. Çalışanlar�
 
 ## Proje Hakkında
 
-İK Analiz, başlangıçta bir ekip projesi olarak başlamış (Süleyman Çakır ve Uğur Gökpınar ile birlikte, danışman: Volkan Sözeri), şu anda tek başına geliştirilmeye devam edilen bir platform. Temel amaç, kurumsal eğitim/bilgi içeriklerini SM-2 algoritmasıyla zamana yayarak çalışanlara tekrar ettirmek ve bu süreci analiz etmek.
+İK Analiz, başlangıçta bir ekip projesi olarak başlamış, şu anda tek başına geliştirilmeye devam edilen bir platform. Temel amaç, kurumsal eğitim/bilgi içeriklerini SM-2 algoritmasıyla zamana yayarak çalışanlara tekrar ettirmek ve bu süreci analiz etmek.
 
 ## Özellikler
 
